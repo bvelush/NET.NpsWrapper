@@ -1,3 +1,8 @@
+# Creating Source in Windows Applications log
+```PowerShell
+New-EventLog -LogName Application -Source "NPS-Wrapper"
+```
+
 # NET.NpsWrapper
 
 NET.NpsWrapper aims to enrich Microsoft Network Policy Server (NPS)
