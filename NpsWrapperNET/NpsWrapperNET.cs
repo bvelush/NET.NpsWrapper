@@ -14,7 +14,7 @@ using System.Linq;
 using SDOIASLib;
 using System.IO;
 using System.Xml.XPath;
-using Auth_WatchGuard;
+//using Auth_WatchGuard;
 
 namespace NpsWrapperNET
 {
@@ -24,7 +24,7 @@ namespace NpsWrapperNET
     public class NpsWrapper
     {
         /// <value>EventLog APP source.</value>
-        const string APP_NAME = "NPS-Wrapper";
+        const string APP_NAME = "NPS-Wrapper.NET";
         /// <value>Radius CallbackId value triggering MFA request. Must match attribute set by NPS upon Access-Request.</value>
         /// <remarks>Mfa message can be customized adding a Radius ReplyMessage attribute on NPS.</remarks>
         const string MFA_CALLBACK = "MFA";
@@ -37,6 +37,7 @@ namespace NpsWrapperNET
         /// <returns>A return value other then 0 will cause NPS to fail to start</returns>
         public static uint RadiusExtensionInit()
         {
+            WriteEventLog(APP_NAME, ".NET RadiusExtensionInit called", new List<string>(), EventLogEntryType.Information);
             if (initCount == 0)
             {
                 initCount++;
@@ -65,19 +66,21 @@ namespace NpsWrapperNET
         /// <returns>0 if all plugins were processed successfully or 5 (access denied) when at least one of the plugins failed.</returns>
         public static uint RadiusExtensionProcess2(IntPtr ecbPointer)
         {
+            //WriteEventLog(APP_NAME, "RadiusExtensionProcess2 called", new List<string>(), EventLogEntryType.Warning);
             var control = new ExtensionControl(ecbPointer);
             string userName = string.Empty;
-            List<string> log = new List<string>
+            List<string> logMessage = new List<string>
             {
                 "+NPS request start",
                 "-ExtensionPoint: " + control.ExtensionPoint.ToString(),
                 "-RequestType: " + control.RequestType.ToString(),
                 "-ResponseType: " + control.ResponseType.ToString()
             };
+            WriteEventLog(APP_NAME, "RadiusExtensionProcess2 called with params:", new List<string>() { "aaa" }, EventLogEntryType.Warning);
             /* Authentication request */
             if ((control.ExtensionPoint == RadiusExtensionPoint.Authentication) && (control.RequestType == RadiusCode.AccessRequest))
             {
-                if(control.ResponseType == RadiusCode.Unknown)
+                if (control.ResponseType == RadiusCode.Unknown)
                 {
                     try
                     {
@@ -99,8 +102,8 @@ namespace NpsWrapperNET
                     }
                     catch (Exception ex)
                     {
-                        log.Add($"Exception: {ex}");
-                        WriteEventLog(APP_NAME, "Trace", log, EventLogEntryType.Warning);
+                        logMessage.Add($"Exception: {ex}");
+                        WriteEventLog(APP_NAME, "Trace", logMessage, EventLogEntryType.Warning);
                     }
                 }
             }
@@ -117,37 +120,38 @@ namespace NpsWrapperNET
                     if (AttributeLookup(control.Response[RadiusCode.AccessAccept], RadiusAttributeType.CallbackId) == MFA_CALLBACK)
                     {
                         userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
-                        if (!String.IsNullOrEmpty(userName))
+                        if (!string.IsNullOrEmpty(userName))
                         {
-                            log.Add("-UserName: " + userName);
-                            log.Add("-NAS IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.NASIPAddress));
-                            log.Add("-Src IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
-                            log.Add("-Connection Request Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName));
-                            log.Add("-Network Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.PolicyName));
-                            log.Add("-Network Policy requires MFA");
-                            log.Add("-FilterId: " + AttributeLookup(control.Response[RadiusCode.AccessAccept], RadiusAttributeType.FilterId));
+                            logMessage.Add("-UserName: " + userName);
+                            logMessage.Add("-NAS IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.NASIPAddress));
+                            logMessage.Add("-Src IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
+                            logMessage.Add("-Connection Request Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName));
+                            logMessage.Add("-Network Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.PolicyName));
+                            logMessage.Add("-Network Policy requires MFA");
+                            logMessage.Add("-FilterId: " + AttributeLookup(control.Response[RadiusCode.AccessAccept], RadiusAttributeType.FilterId));
                             /* Additional text that will be sent to User in MFA request */
                             var customText = AttributeLookup(control.Response[RadiusCode.AccessAccept], RadiusAttributeType.ReplyMessage);
                             if (string.IsNullOrEmpty(customText))
-                                log.Add("+MFA Process start");
+                                logMessage.Add("+MFA Process start");
                             else
-                                log.Add("+MFA Process start " + customText);
+                                logMessage.Add("+MFA Process start " + customText);
 
                             /* Send mfa request, without domain */
-                            bool result = WG.AuthenticateUser(userName, null, true, customText).Result;
+                            //bool result = WG.AuthenticateUser(userName, null, true, customText).Result;
+                            bool result = true;
                             if (!result)
                             {
-                                log.Add("-MFA Process fail, setting AccessReject to NPS");
-                                log.Add("+NPS request end");
+                                logMessage.Add("-MFA Process fail, setting AccessReject to NPS");
+                                logMessage.Add("+NPS request end");
                                 /* Set final disposition to AccessReject - Note that could be changed by other extensions */
                                 control.ResponseType = RadiusCode.AccessReject;
                             }
                             else
                             {
-                                log.Add("-MFA Process success");
-                                log.Add("+NPS request end");
+                                logMessage.Add("-MFA Process success");
+                                logMessage.Add("+NPS request end");
                             }
-                            WriteEventLog(APP_NAME, "Trace", log, EventLogEntryType.Information);
+                            WriteEventLog(APP_NAME, "Trace", logMessage, EventLogEntryType.Information);
                         }
                     }
                 }

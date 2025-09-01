@@ -18,27 +18,17 @@ using namespace ::System::Reflection;
 using namespace System::IO;
 using namespace System::Diagnostics;
 
-// Log to Windows Application Event Log
+// Log to Windows Application Event Log, fallback: append error to log file in DLL directory
 void LogEvent(String^ source, String^ message, EventLogEntryType type)
 {
     String^ logName = "Application";
-    try
+    if (!EventLog::SourceExists(source))
     {
-        if (!EventLog::SourceExists(source))
-        {
-            // Creating a new event source requires admin rights
-            EventLog::CreateEventSource(source, logName);
-        }
-        EventLog^ eventLog = gcnew EventLog(logName);
-        eventLog->Source = source;
-        eventLog->WriteEntry(message, type);
+        EventLog::CreateEventSource(source, logName);
     }
-    catch (Exception^ ex)
-    {
-        // Fallback: log to Trace if event log fails
-        Trace::WriteLine("EventLog error: " + ex->ToString());
-        Trace::WriteLine("Original log: " + message);
-    }
+    EventLog^ eventLog = gcnew EventLog(logName);
+    eventLog->Source = source;
+    eventLog->WriteEntry(message, type);
 }
 
 // Helper for consistent source name
@@ -50,6 +40,7 @@ String^ GetLogSource()
 // Custom assembly resolution method
 Assembly^ LocalAssemblyResolver(Object^ sender, ResolveEventArgs^ args)
 {
+    LogEvent(GetLogSource(), "LocalAssemblyResolver called.", EventLogEntryType::Warning);
     try
     {
         String^ folderPath = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);

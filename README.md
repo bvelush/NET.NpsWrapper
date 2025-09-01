@@ -1,7 +1,12 @@
 # Creating Source in Windows Applications log
 ```PowerShell
 New-EventLog -LogName Application -Source "NPS-Wrapper"
+New-EventLog -LogName Application -Source "NPS-Wrapper.NET"
 ```
+
+# Deploy
+
+run deploy.cmd
 
 # NET.NpsWrapper
 

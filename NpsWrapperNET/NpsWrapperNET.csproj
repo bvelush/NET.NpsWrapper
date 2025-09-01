@@ -73,11 +73,5 @@
   <ItemGroup>
     <None Include="app.config" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Auth_WatchGuard\Auth_WatchGuard.csproj">
-      <Project>{49f456d8-42a2-4fdc-b2c4-98888c26eb9c}</Project>
-      <Name>Auth_WatchGuard</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
