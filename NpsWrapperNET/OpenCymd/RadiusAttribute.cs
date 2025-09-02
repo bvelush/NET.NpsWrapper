@@ -14,8 +14,7 @@
 // </copyright>
 // --------------------------------------------------------------------------------------------------------------------
 
-namespace OpenCymd.Nps.Plugin
-{
+namespace OpenCymd.Nps.Plugin {
     using System;
     using System.Linq;
     using System.Net;
@@ -28,8 +27,7 @@ namespace OpenCymd.Nps.Plugin
     /// <summary>
     /// Attribute in a RADIUS message.
     /// </summary>
-    public class RadiusAttribute
-    {
+    public class RadiusAttribute {
         private readonly uint attributeId;
 
         private readonly object value;
@@ -44,8 +42,7 @@ namespace OpenCymd.Nps.Plugin
         /// <param name="attribute">ID of the attribute according to RFC2865.</param>
         /// <param name="value">The value of the attribute.</param>
         public RadiusAttribute(RadiusAttributeType attribute, object value)
-            : this((int)attribute, value)
-        {
+            : this((int)attribute, value) {
         }
 
         /// <summary>
@@ -53,15 +50,12 @@ namespace OpenCymd.Nps.Plugin
         /// </summary>
         /// <param name="attributeId">ID of the attribute according to RFC2865.</param>
         /// <param name="value">The value of the attribute.</param>
-        public RadiusAttribute(int attributeId, object value)
-        {
-            if (value == null)
-            {
+        public RadiusAttribute(int attributeId, object value) {
+            if (value == null) {
                 throw new ArgumentNullException("value");
             }
 
-            if (attributeId < 0)
-            {
+            if (attributeId < 0) {
                 throw new ArgumentOutOfRangeException("attributeId", "must be positive");
             }
 
@@ -73,8 +67,7 @@ namespace OpenCymd.Nps.Plugin
         /// Initializes a new instance of the <see cref="RadiusAttribute"/> class.
         /// </summary>
         /// <param name="radiusAttributePtr">Pointer to the native attribute.</param>
-        internal RadiusAttribute(IntPtr radiusAttributePtr)
-        {
+        internal RadiusAttribute(IntPtr radiusAttributePtr) {
             this.radiusAttributePtr = radiusAttributePtr;
             this.radiusAttribute = (RADIUS_ATTRIBUTE)Marshal.PtrToStructure(this.radiusAttributePtr, typeof(RADIUS_ATTRIBUTE));
         }
@@ -82,10 +75,8 @@ namespace OpenCymd.Nps.Plugin
         /// <summary>
         /// Gets the ID of the attribute according to RFC2865.
         /// </summary>
-        public virtual int AttributeId
-        {
-            get
-            {
+        public virtual int AttributeId {
+            get {
                 return (int)(this.radiusAttribute == null ? this.attributeId : this.radiusAttribute.dwAttrType);
             }
         }
@@ -93,10 +84,8 @@ namespace OpenCymd.Nps.Plugin
         /// <summary>
         /// Gets the value of the attribute.
         /// </summary>
-        public virtual object Value
-        {
-            get
-            {
+        public virtual object Value {
+            get {
                 return this.value ?? this.GetAttributeValue();
             }
         }
@@ -105,10 +94,8 @@ namespace OpenCymd.Nps.Plugin
         /// Gets the native representation of this attribute. The caller is responsible to free the memory allocated in this method with a call to <see cref="FreeNativeAttribute"/>.
         /// </summary>
         /// <returns>The native representation of this attribute.</returns>
-        internal RADIUS_ATTRIBUTE GetNativeAttribute()
-        {
-            if (this.radiusAttribute == null)
-            {
+        internal RADIUS_ATTRIBUTE GetNativeAttribute() {
+            if (this.radiusAttribute == null) {
                 this.radiusAttribute = new RADIUS_ATTRIBUTE { dwAttrType = this.attributeId };
                 this.SetAttributeValue();
             }
@@ -119,16 +106,13 @@ namespace OpenCymd.Nps.Plugin
         /// <summary>
         /// Releases the memory allocated during a call to <see cref="GetNativeAttribute"/>
         /// </summary>
-        internal void FreeNativeAttribute()
-        {
-            if (this.radiusAttribute == null)
-            {
+        internal void FreeNativeAttribute() {
+            if (this.radiusAttribute == null) {
                 return;
             }
 
             var ip = this.value as IPAddress;
-            if (ip != null && ip.AddressFamily == AddressFamily.InterNetworkV6)
-            {
+            if (ip != null && ip.AddressFamily == AddressFamily.InterNetworkV6) {
                 Marshal.FreeHGlobal(this.radiusAttribute.Value.lpValue);
                 this.radiusAttribute = null;
                 return;
@@ -136,20 +120,16 @@ namespace OpenCymd.Nps.Plugin
 
             if (this.value is string ||
                 this.value is byte[] ||
-                this.value is VendorSpecificAttribute)
-            {
+                this.value is VendorSpecificAttribute) {
                 Marshal.FreeHGlobal(this.radiusAttribute.Value.lpValue);
                 this.radiusAttribute = null;
             }
         }
 
-        private void SetAttributeValue()
-        {
+        private void SetAttributeValue() {
             var ip = this.value as IPAddress;
-            if (ip != null)
-            {
-                switch (ip.AddressFamily)
-                {
+            if (ip != null) {
+                switch (ip.AddressFamily) {
                     case AddressFamily.InterNetwork:
                         this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtAddress;
                         this.radiusAttribute.dwAttrType = BitConverter.ToUInt32(ip.GetAddressBytes().Reverse().ToArray(), 0);
@@ -169,8 +149,7 @@ namespace OpenCymd.Nps.Plugin
             }
 
             var s = this.value as string;
-            if (s != null)
-            {
+            if (s != null) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtString;
 
                 // Marshal.StringToHGlobal* are inappropriate as they are not UTF8 and include a terminating null char
@@ -181,22 +160,19 @@ namespace OpenCymd.Nps.Plugin
                 return;
             }
 
-            if (this.value is int)
-            {
+            if (this.value is int) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtInteger;
                 this.radiusAttribute.Value.dwValue = (uint)(int)this.value;
                 return;
             }
 
-            if (this.value is uint)
-            {
+            if (this.value is uint) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtInteger;
                 this.radiusAttribute.Value.dwValue = (uint)this.value;
                 return;
             }
 
-            if (this.value is DateTime)
-            {
+            if (this.value is DateTime) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtTime;
                 var dt = (DateTime)this.value;
                 this.radiusAttribute.Value.dwValue = (uint)dt.Ticks;
@@ -204,8 +180,7 @@ namespace OpenCymd.Nps.Plugin
             }
 
             var bytes = this.value as byte[];
-            if (bytes != null)
-            {
+            if (bytes != null) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtString;
                 this.radiusAttribute.Value.lpValue = Marshal.AllocHGlobal(bytes.Length);
                 this.radiusAttribute.cbDataLength = (uint)bytes.Length;
@@ -214,8 +189,7 @@ namespace OpenCymd.Nps.Plugin
             }
 
             var vsa = this.value as VendorSpecificAttribute;
-            if (vsa != null)
-            {
+            if (vsa != null) {
                 this.radiusAttribute.fDataType = RADIUS_DATA_TYPE.rdtString;
                 byte[] vsaData = vsa;
                 this.radiusAttribute.Value.lpValue = Marshal.AllocHGlobal(vsaData.Length);
@@ -227,22 +201,18 @@ namespace OpenCymd.Nps.Plugin
             throw new ArgumentException(string.Format("Type {0} is not supported.", this.value.GetType().FullName));
         }
 
-        private object GetAttributeValue()
-        {
+        private object GetAttributeValue() {
             object result = null;
-            if (this.radiusAttribute.dwAttrType == (uint)RadiusAttributeType.VendorSpecific)
-            {
+            if (this.radiusAttribute.dwAttrType == (uint)RadiusAttributeType.VendorSpecific) {
                 return new VendorSpecificAttribute(this.radiusAttribute.Value.lpValue);
             }
 
-            switch (this.radiusAttribute.fDataType)
-            {
+            switch (this.radiusAttribute.fDataType) {
                 case RADIUS_DATA_TYPE.rdtAddress:
                     // as of Win 2008, dwValue arrives in Network Byte Order, which is exactly what the constructor expects
                     result = new IPAddress(this.radiusAttribute.Value.dwValue);
                     break;
-                case RADIUS_DATA_TYPE.rdtIpv6Address:
-                    {
+                case RADIUS_DATA_TYPE.rdtIpv6Address: {
                         var data = new byte[this.radiusAttribute.cbDataLength];
                         Marshal.Copy(this.radiusAttribute.Value.lpValue, data, 0, (int)this.radiusAttribute.cbDataLength);
                         result = new IPAddress(data);
@@ -259,8 +229,7 @@ namespace OpenCymd.Nps.Plugin
                 case RADIUS_DATA_TYPE.rdtUnknown:
                     // string means actually byte[], any real string would be 'text', but that is attribute-type specific
                     {
-                        if (this.radiusAttribute.Value.lpValue != IntPtr.Zero)
-                        {
+                        if (this.radiusAttribute.Value.lpValue != IntPtr.Zero) {
                             var data = new byte[this.radiusAttribute.cbDataLength];
                             Marshal.Copy(this.radiusAttribute.Value.lpValue, data, 0, (int)this.radiusAttribute.cbDataLength);
                             result = data;
