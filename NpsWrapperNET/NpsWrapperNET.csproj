@@ -74,11 +74,5 @@
     <None Include=".editorconfig" />
     <None Include="app.config" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\TgBot\TgBot.csproj">
-      <Project>{2acaaf9e-7c7a-4088-81c1-62112169d0f2}</Project>
-      <Name>TgBot</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

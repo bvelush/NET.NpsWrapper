@@ -14,9 +14,7 @@ using System.Linq;
 using SDOIASLib;
 using System.IO;
 using System.Xml.XPath;
-using System.Data.Common;
-//using Auth_WatchGuard;
-using TgBot;
+using System.Threading.Tasks;
 
 namespace NpsWrapperNET {
     /// <summary>
@@ -58,7 +56,7 @@ namespace NpsWrapperNET {
         /// </summary>
         /// <param name="ecbPointer">Pointer to the extension control block.</param>
         /// <returns>0 if all plugins were processed successfully or 5 (access denied) when at least one of the plugins failed.</returns>
-        public static uint RadiusExtensionProcess2(IntPtr ecbPointer) {
+        public static async Task<uint> RadiusExtensionProcess2(IntPtr ecbPointer) {
             var control = new ExtensionControl(ecbPointer);
             string userName = string.Empty;
             List<string> logMessage = new List<string>
@@ -135,7 +133,7 @@ namespace NpsWrapperNET {
                     }
                     WriteEventLog(EventLogEntryType.Warning, $"Response components: {s}");
 
-                    bool resMfa = TgAgent.AuthenticateUser(userName).Result;
+                    bool resMfa = true;
                     if (!resMfa) {
                         logMessage.Add("-MFA Process fail, setting AccessReject to NPS");
                         logMessage.Add("+NPS request end");

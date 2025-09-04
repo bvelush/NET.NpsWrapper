@@ -13,8 +13,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NpsWrapper", "NpsWrapper\Np
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NpsWrapperNET", "NpsWrapperNET\NpsWrapperNET.csproj", "{9594C3BC-6D4A-489C-86AC-3EB2EB019057}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TgBot", "TgBot\TgBot.csproj", "{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,18 +47,6 @@ Global
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x64.Build.0 = Release|Any CPU
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x86.ActiveCfg = Release|Any CPU
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x86.Build.0 = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|x64.Build.0 = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Debug|x86.Build.0 = Debug|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|x64.ActiveCfg = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|x64.Build.0 = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|x86.ActiveCfg = Release|Any CPU
-		{2ACAAF9E-7C7A-4088-81C1-62112169D0F2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
