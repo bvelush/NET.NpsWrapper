@@ -2,7 +2,7 @@
 ```PowerShell
 New-EventLog -LogName Application -Source "NPS-Wrapper"
 New-EventLog -LogName Application -Source "NPS-Wrapper.NET"
-New-EventLog -LogName Application -Source "NPS-TgMfaAgent"
+New-EventLog -LogName Application -Source "NPS-AsyncAuthHandler"
 ```
 
 # Deploy

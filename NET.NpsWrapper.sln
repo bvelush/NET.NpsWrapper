@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NpsWrapper", "NpsWrapper\Np
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NpsWrapperNET", "NpsWrapperNET\NpsWrapperNET.csproj", "{9594C3BC-6D4A-489C-86AC-3EB2EB019057}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsyncAuthHandler", "AsyncAuthHandler\AsyncAuthHandler.csproj", "{76AF0A05-C47C-4F32-8008-4D09689F5892}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,18 @@ Global
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x64.Build.0 = Release|Any CPU
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x86.ActiveCfg = Release|Any CPU
 		{9594C3BC-6D4A-489C-86AC-3EB2EB019057}.Release|x86.Build.0 = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|x64.Build.0 = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Debug|x86.Build.0 = Debug|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|x64.ActiveCfg = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|x64.Build.0 = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|x86.ActiveCfg = Release|Any CPU
+		{76AF0A05-C47C-4F32-8008-4D09689F5892}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
