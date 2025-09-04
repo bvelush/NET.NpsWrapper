@@ -2,6 +2,7 @@
 ```PowerShell
 New-EventLog -LogName Application -Source "NPS-Wrapper"
 New-EventLog -LogName Application -Source "NPS-Wrapper.NET"
+New-EventLog -LogName Application -Source "NPS-TgMfaAgent"
 ```
 
 # Deploy
