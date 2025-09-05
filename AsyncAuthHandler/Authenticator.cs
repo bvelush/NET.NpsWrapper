@@ -32,7 +32,7 @@ namespace AsyncAuthHandler {
 
         public async Task<bool> AuthenticateAsync(string samid) {
             try {
-                var json = JsonConvert.SerializeObject(new { samid = samid });
+                var json = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 WriteEventLog(LogLevel.Trace, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
                 var response = await _httpClient.PostAsync($"{_serviceUrl}/Authenticate", content);
