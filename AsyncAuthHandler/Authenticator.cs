@@ -30,52 +30,73 @@ namespace AsyncAuthHandler {
             _httpClient.Timeout = TimeSpan.FromSeconds(authTimeout);
         }
 
+        private enum AuthStatusEnum {
+            PENDING = 1,
+            SUCCESS = 2,
+            FAILURE = 3
+        }
+
+        private class AuthResultResponse {
+            public AuthStatusEnum status { get; set; }
+        }
+
         public async Task<bool> AuthenticateAsync(string samid) {
             try {
                 // TODO: lets generate requestid here, send auth request, then poll for result
-                var json = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var requestId = Guid.NewGuid().ToString();
+                var authRequestJson = JsonConvert.SerializeObject(new { request_id = requestId, samid = samid, requestor = "SMK-RDG" });
                 WriteEventLog(LogLevel.Trace, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
-                var response = await _httpClient.PostAsync($"{_serviceUrl}/Authenticate", content);
-                if (!response.IsSuccessStatusCode) {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    WriteEventLog(LogLevel.Error, $"Service responded with status: {response.StatusCode}, content: {responseContent}");
+                var authenticateResponse = await _httpClient.PostAsync(
+                    $"{_serviceUrl}/Authenticate", 
+                    new StringContent(authRequestJson, Encoding.UTF8, "application/json")
+                );
+                if (!authenticateResponse.IsSuccessStatusCode) {
+                    var responseContent = await authenticateResponse.Content.ReadAsStringAsync();
+                    WriteEventLog(LogLevel.Error, $"Service responded with status: {authenticateResponse.StatusCode}, content: {responseContent}");
                     return false;
                 }
-                var responseJson = await response.Content.ReadAsStringAsync();
-                var resultObj = JsonConvert.DeserializeObject<ResultResponse>(responseJson);
-                string requestId = resultObj?.request_id;
+                var authenticateResponseJson = await authenticateResponse.Content.ReadAsStringAsync();
+                WriteEventLog(LogLevel.Trace, $"Received authentication response for user: {samid}, response: {authenticateResponseJson}");
+                var authenticateResponseObj = JsonConvert.DeserializeObject<AuthResultResponse>(authenticateResponseJson);
+                WriteEventLog(LogLevel.Trace, $"Deserialized authentication response for user: {samid}, status: {authenticateResponseObj?.status}");
+                if (authenticateResponseObj == null) {
+                    WriteEventLog(LogLevel.Error, $"Invalid response from service for user: {samid}");
+                    return false;
+                }
+                if (authenticateResponseObj.status == AuthStatusEnum.FAILURE) { // early answer, no need of polling
+                    WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid} without polling");
+                    return false;
+                }
+
                 if (string.IsNullOrEmpty(requestId)) {
                     WriteEventLog(LogLevel.Error, $"Incorrect response: No request_id received for user: {samid}");
                     return false;
                 }
                 WriteEventLog(LogLevel.Trace, $"Received request_id: {requestId} for user: {samid}");
                 await Task.Delay(_waitBeforePoll * 1000);
-                var pollObj = new { request_id = requestId };
-                var pollJson = JsonConvert.SerializeObject(pollObj);
-                string pollUrl = $"{_serviceUrl}/AuthResult";
                 for (int i = 0; i < _pollMaxSeconds; i++) {
-                    var pollContent = new StringContent(pollJson, Encoding.UTF8, "application/json");
                     try {
                         WriteEventLog(LogLevel.Trace, $"Polling AuthResult for user: {samid}, request_id: {requestId}, attempt: {i + 1}");
-                        var pollResponse = await _httpClient.PostAsync(pollUrl, pollContent);
-                        if (!pollResponse.IsSuccessStatusCode) {
-                            var pollResponseContent = await pollResponse.Content.ReadAsStringAsync();
-                            WriteEventLog(LogLevel.Warning, $"AuthResult responded with status: {pollResponse.StatusCode}, content: {pollResponseContent}");
+                        var authResultResponse = await _httpClient.PostAsync(
+                            $"{_serviceUrl}/AuthResult",
+                            new StringContent(authRequestJson, Encoding.UTF8, "application/json")
+                        );
+                        var authResultResponseContent = await authResultResponse.Content.ReadAsStringAsync();
+                        if (!authResultResponse.IsSuccessStatusCode) {
+                            WriteEventLog(LogLevel.Warning, $"AuthResult responded with status: {authResultResponse.StatusCode}, content: {authResultResponseContent}");
                             return false;
                         }
-                        var pollResponseJson = await pollResponse.Content.ReadAsStringAsync();
-                        var pollResultObj = JsonConvert.DeserializeObject<AuthResultResponse>(pollResponseJson);
-                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, request_id: {requestId}, response: {pollResponseJson}");
-                        if (pollResultObj == null) {
+                        var authResultResponseJson = JsonConvert.DeserializeObject<AuthResultResponse>(authResultResponseContent);
+                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, request_id: {requestId}, response: {authResultResponseContent}");
+                        if (authResultResponseJson == null) {
                             WriteEventLog(LogLevel.Error, $"Invalid AuthResult response for request_id: {requestId}");
                             return false;
                         }
-                        if (pollResultObj.result == 2) {
+                        if (authResultResponseJson.status == AuthStatusEnum.SUCCESS) { // auth success
                             WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid}, request_id: {requestId}");
                             return true;
                         }
-                        if (pollResultObj.result == 3) {
+                        if (authResultResponseJson.status == AuthStatusEnum.FAILURE) { // auth failure
                             WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid}, request_id: {requestId}");
                             return false;
                         }
@@ -111,14 +132,6 @@ namespace AsyncAuthHandler {
                 WriteEventLog(LogLevel.Error, $"Error authenticating user {samid}: {ex.Message}, {ex.StackTrace}");
                 return false;
             }
-        }
-
-        private class ResultResponse {
-            public string request_id { get; set; }
-        }
-
-        private class AuthResultResponse {
-            public int result { get; set; }
         }
 
         private void WriteEventLog(LogLevel level, string subj, List<string> subj_body = null) {
