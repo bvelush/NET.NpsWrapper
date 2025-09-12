@@ -11,6 +11,7 @@
 #include <lmcons.h>
 #include "radutil.h"
 #include "libloaderapi.h"
+#include <msclr/marshal_cppstd.h>
 
 using namespace System;
 using namespace System::Runtime::InteropServices;
@@ -18,66 +19,118 @@ using namespace ::System::Reflection;
 using namespace System::IO;
 using namespace System::Diagnostics;
 
-// Log to Windows Application Event Log, fallback: append error to log file in DLL directory
-void LogEvent(String^ source, String^ message, EventLogEntryType type)
+// LogLevel enum
+public enum class LogLevel {
+    Trace,
+    Information,
+    Warning,
+    Error
+};
+
+static bool g_initialized = false;
+static bool g_enableTraceLogging = false;
+
+// Registry path and key
+static const wchar_t* REG_PATH = L"SOFTWARE\\NpsWrapperNET";
+static const wchar_t* ENABLE_TRACE_KEY = L"EnableTraceLogging";
+
+// Log name and source constants
+public ref class LogConstants abstract sealed
 {
-    String^ logName = "Application";
-    if (!EventLog::SourceExists(source))
-    {
-        EventLog::CreateEventSource(source, logName);
+public:
+    literal System::String^ LOG_NAME = "Application";
+    literal System::String^ LOG_SOURCE = "NPS-Wrapper";
+};
+
+// Map LogLevel to EventLogEntryType
+EventLogEntryType MapLogLevel(LogLevel level) {
+    switch (level) {
+    case LogLevel::Trace:
+        return EventLogEntryType::Information;
+    case LogLevel::Information:
+        return EventLogEntryType::Information;
+    case LogLevel::Warning:
+        return EventLogEntryType::Warning;
+    case LogLevel::Error:
+        return EventLogEntryType::Error;
+    default:
+        return EventLogEntryType::Information;
     }
-    EventLog^ eventLog = gcnew EventLog(logName);
-    eventLog->Source = source;
-    eventLog->WriteEntry(message, type);
 }
 
-// Helper for consistent source name
-String^ GetLogSource()
+// Log to Windows Application Event Log, fallback: append error to log file in DLL directory
+void LogEvent(LogLevel level, System::String^ message)
 {
-    return "NPS-Wrapper";
+    if (level == LogLevel::Trace && !g_enableTraceLogging)
+        return;
+    if (!EventLog::SourceExists(LogConstants::LOG_SOURCE))
+    {
+        EventLog::CreateEventSource(LogConstants::LOG_SOURCE, LogConstants::LOG_NAME);
+    }
+    EventLog^ eventLog = gcnew EventLog(LogConstants::LOG_NAME);
+    eventLog->Source = LogConstants::LOG_SOURCE;
+    if (level == LogLevel::Trace)
+        message = String::Concat("[TRACE] ", message);
+    eventLog->WriteEntry(message, MapLogLevel(level));
+}
+
+// Read EnableTraceLogging from registry
+void ReadTraceLoggingSetting()
+{
+    HKEY hKey;
+    DWORD traceVal = 0;
+    DWORD dwType = REG_DWORD;
+    DWORD dwSize = sizeof(DWORD);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, REG_PATH, 0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
+        if (RegQueryValueExW(hKey, ENABLE_TRACE_KEY, nullptr, &dwType, (LPBYTE)&traceVal, &dwSize) == ERROR_SUCCESS)
+        {
+            g_enableTraceLogging = (traceVal == 1);
+        }
+        RegCloseKey(hKey);
+    }
 }
 
 // Custom assembly resolution method
 Assembly^ LocalAssemblyResolver(Object^ sender, ResolveEventArgs^ args)
 {
-    LogEvent(GetLogSource(), "LocalAssemblyResolver called.", EventLogEntryType::Warning);
+    LogEvent(LogLevel::Trace, "LocalAssemblyResolver called.");
     try
     {
-        String^ folderPath = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
-        String^ assemblyPath = Path::Combine(folderPath, args->Name->Split(',')[0] + ".dll");
-        LogEvent(GetLogSource(), "Assembly resolve requested: " + args->Name, EventLogEntryType::Information);
+        System::String^ folderPath = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
+        System::String^ assemblyPath = Path::Combine(folderPath, String::Concat(args->Name->Split(',')[0], ".dll"));
+        LogEvent(LogLevel::Information, String::Concat("Assembly resolve requested: ", args->Name));
 
         if (File::Exists(assemblyPath))
         {
-            LogEvent(GetLogSource(), "Loading assembly from: " + assemblyPath, EventLogEntryType::Information);
+            LogEvent(LogLevel::Information, String::Concat("Loading assembly from: ", assemblyPath));
             return Assembly::LoadFrom(assemblyPath);
         }
 
-        LogEvent(GetLogSource(), "Assembly not found: " + assemblyPath, EventLogEntryType::Warning);
+        LogEvent(LogLevel::Warning, String::Concat("Assembly not found: ", assemblyPath));
         return nullptr;
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error in LocalAssemblyResolver: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error in LocalAssemblyResolver: ", ex->ToString()));
         return nullptr;
     }
 }
 
 // Use a static variable to track initialization
-static bool g_initialized = false;
-
 void Initialize()
 {
     try
     {
-        LogEvent(GetLogSource(), "Initializing NpsWrapper...", EventLogEntryType::Information);
+        ReadTraceLoggingSetting();
+        LogEvent(LogLevel::Information, "Initializing NpsWrapper...");
         AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = true;
-        LogEvent(GetLogSource(), "NpsWrapper initialized.", EventLogEntryType::Information);
+        LogEvent(LogLevel::Information, "NpsWrapper initialized.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error during Initialize: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error during Initialize: ", ex->ToString()));
     }
 }
 
@@ -85,65 +138,65 @@ void Cleanup()
 {
     try
     {
-        LogEvent(GetLogSource(), "Cleaning up NpsWrapper...", EventLogEntryType::Information);
+        LogEvent(LogLevel::Information, "Cleaning up NpsWrapper...");
         AppDomain::CurrentDomain->AssemblyResolve -= gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = false;
-        LogEvent(GetLogSource(), "NpsWrapper cleaned up.", EventLogEntryType::Information);
+        LogEvent(LogLevel::Information, "NpsWrapper cleaned up.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error during Cleanup: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error during Cleanup: ", ex->ToString()));
     }
 }
 
 DWORD WINAPI RadiusExtensionInit(VOID)
 {
-    LogEvent(GetLogSource(), "RadiusExtensionInit called.", EventLogEntryType::Information);
+    LogEvent(LogLevel::Trace, "RadiusExtensionInit called.");
     try
     {
         if (!g_initialized)
             Initialize();
         DWORD result = NpsWrapperNET::NpsWrapper::RadiusExtensionInit();
-        LogEvent(GetLogSource(), "RadiusExtensionInit completed with result: " + result, EventLogEntryType::Information);
+        LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionInit completed with result: ", result.ToString()));
         return result;
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error in RadiusExtensionInit: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionInit: ", ex->ToString()));
         return ERROR_GEN_FAILURE;
     }
 }
 
 VOID WINAPI RadiusExtensionTerm(VOID)
 {
-    LogEvent(GetLogSource(), "RadiusExtensionTerm called.", EventLogEntryType::Information);
+    LogEvent(LogLevel::Trace, "RadiusExtensionTerm called.");
     try
     {
         if (g_initialized)
             Cleanup();
         NpsWrapperNET::NpsWrapper::RadiusExtensionTerm();
-        LogEvent(GetLogSource(), "RadiusExtensionTerm completed.", EventLogEntryType::Information);
+        LogEvent(LogLevel::Trace, "RadiusExtensionTerm completed.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error in RadiusExtensionTerm: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionTerm: ", ex->ToString()));
     }
 }
 
 DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
 {
-    LogEvent(GetLogSource(), "RadiusExtensionProcess2 called.", EventLogEntryType::Information);
+    LogEvent(LogLevel::Trace, "RadiusExtensionProcess2 called.");
     try
     {
         if (!g_initialized)
             Initialize();
         DWORD result = NpsWrapperNET::NpsWrapper::RadiusExtensionProcess2(IntPtr(pECB));
-        LogEvent(GetLogSource(), "RadiusExtensionProcess2 completed with result: " + result, EventLogEntryType::Information);
+        LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
         return result;
     }
     catch (Exception^ ex)
     {
-        LogEvent(GetLogSource(), "Error in RadiusExtensionProcess2: " + ex->ToString(), EventLogEntryType::Error);
+        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionProcess2: ", ex->ToString()));
         return ERROR_GEN_FAILURE;
     }
 }
@@ -155,5 +208,4 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     // No managed code should be called here!
     return TRUE;
 }
-
 // --------------------------------------------------------------------------------------------------------------------
