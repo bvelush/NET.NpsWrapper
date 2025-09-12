@@ -1,0 +1,10 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
+"NoMfaGroups"="SMK\\tsg-direct;SMK\\TSG NO MFA"
+"EnableTraceLogging"=dword:00000001
+"AuthTimeout"=dword:0000003c
+"ServiceUrl"="http://localhost:8000"
+"WaitBeforePoll"=dword:0000000a
+"PollInterval"=dword:00000001
+"PollMaxSeconds"=dword:0000003c

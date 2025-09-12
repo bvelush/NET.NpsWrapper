@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 
 namespace AsyncAuthHandler {
@@ -17,17 +18,64 @@ namespace AsyncAuthHandler {
     public class Authenticator {
 
         const string APP_NAME = "NPS-AsyncAuthHandler";
-        const int authTimeout = 60; // seconds
-        private readonly string _serviceUrl = "http://localhost:8000";
-        private readonly int _waitBeforePoll = 10; // seconds
-        private readonly int _pollInterval = 1; // seconds
-        private readonly int _pollMaxSeconds = 60; // seconds
         private readonly HttpClient _httpClient;
-        private readonly bool _enableTraceLogging = true;
+
+        private int _authTimeout = 60; // seconds
+        private string _serviceUrl = "http://localhost:8000";
+        private int _waitBeforePoll = 10; // seconds
+        private int _pollInterval = 1; // seconds
+        private int _pollMaxSeconds = 60; // seconds
+        private bool _enableTraceLogging = false;
+
+        private const string _regPath = @"SOFTWARE\NpsWrapperNET";
+        private const string _authTimeoutKey = "AuthTimeout";
+        private const string _serviceUrlKey = "ServiceUrl";
+        private const string _waitBeforePollKey = "WaitBeforePoll";
+        private const string _pollIntervalKey = "PollInterval";
+        private const string _pollMaxSecondsKey = "PollMaxSeconds";
+        private const string _enableTraceLoggingKey = "EnableTraceLogging";
 
         public Authenticator() {
+            // Read settings from registry
+            try {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
+                    if (key != null) {
+                        _authTimeout = GetIntRegistryValue(key, _authTimeoutKey, 60);
+                        _serviceUrl = GetStringRegistryValue(key, _serviceUrlKey, "http://localhost:8000");
+                        _waitBeforePoll = GetIntRegistryValue(key, _waitBeforePollKey, 10);
+                        _pollInterval = GetIntRegistryValue(key, _pollIntervalKey, 1);
+                        _pollMaxSeconds = GetIntRegistryValue(key, _pollMaxSecondsKey, 60);
+                        _enableTraceLogging = GetBoolRegistryValue(key, _enableTraceLoggingKey, false);
+                    }
+                }
+            } catch (Exception ex) {
+                WriteEventLog(LogLevel.Warning, $"Error reading settings from registry: {ex.Message}");
+            }
+
             _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(authTimeout);
+            _httpClient.Timeout = TimeSpan.FromSeconds(_authTimeout);
+        }
+
+        private int GetIntRegistryValue(RegistryKey key, string valueName, int defaultValue)
+        {
+            var val = key.GetValue(valueName);
+            if (val != null && int.TryParse(val.ToString(), out int result))
+                return result;
+            return defaultValue;
+        }
+
+        private bool GetBoolRegistryValue(RegistryKey key, string valueName, bool defaultValue)
+        {
+            var val = key.GetValue(valueName);
+            if (val != null && int.TryParse(val.ToString(), out int result))
+                return result == 1;
+            return defaultValue;
+        }
+
+        private string GetStringRegistryValue(RegistryKey key, string valueName, string defaultValue)
+        {
+            var val = key.GetValue(valueName);
+            return val != null ? val.ToString() : defaultValue;
         }
 
         private enum AuthStatusEnum {
@@ -108,7 +156,7 @@ namespace AsyncAuthHandler {
                         return false;
                     }
                     catch (HttpRequestException ex) {
-                        WriteEventLog(LogLevel.Error, $"Service unreachable while polling AuthResult for user {samid}: {ex.Message}");
+                        WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while polling AuthResult for user {samid}: {ex.Message}");
                         return false;
                     }
                     catch (Exception ex) {
@@ -125,7 +173,7 @@ namespace AsyncAuthHandler {
                 return false;
             }
             catch (HttpRequestException ex) {
-                WriteEventLog(LogLevel.Error, $"Service unreachable while authenticating user {samid}: {ex.Message}");
+                WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while authenticating user {samid}: {ex.Message}");
                 return false;
             }
             catch (Exception ex) {

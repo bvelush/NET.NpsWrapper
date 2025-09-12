@@ -11,13 +11,18 @@ using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
-using SDOIASLib;
-using System.IO;
-using System.Xml.XPath;
-using System.Threading.Tasks;
 using AsyncAuthHandler;
+using System.DirectoryServices.AccountManagement;
+using Microsoft.Win32;
 
 namespace NpsWrapperNET {
+    public enum LogLevel {
+        Trace,
+        Information,
+        Warning,
+        Error
+    }
+
     /// <summary>
     /// Provides the entry points for the NPS service (indirectly called by the C++/CLR wrapper).
     /// </summary>
@@ -27,6 +32,15 @@ namespace NpsWrapperNET {
         private static int initCount = 0;
         // Add a static field for the authenticator
         private static Authenticator _authenticator;
+        // Store NoMFA group SIDs
+        private static HashSet<string> _noMfaGroupSids = new HashSet<string>();
+        private static bool _enableTraceLogging = false;
+        // Registry path and value name for NoMFA groups
+        // [HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
+        // "NoMfaGroups"="Group1;Group2;Group3"
+        private const string _regPath = @"SOFTWARE\\NpsWrapperNET";
+        private const string _noMfaKey = "NoMfaGroups";
+        private const string _enableTraceLoggingKey = "EnableTraceLogging";
 
         /// <summary>
         /// <para>Called by NPS while the service is starting up</para>
@@ -34,11 +48,49 @@ namespace NpsWrapperNET {
         /// </summary>
         /// <returns>A return value other then 0 will cause NPS to fail to start</returns>
         public static uint RadiusExtensionInit() {
-            WriteEventLog(EventLogEntryType.Information, "RadiusExtensionInit called");
+            WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
             if (initCount == 0) {
                 initCount++;
-                // Initialize the authenticator here
                 _authenticator = new Authenticator();
+                try {
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
+                        if (key != null) {
+                            // Read trace logging setting
+                            var traceValue = key.GetValue(_enableTraceLoggingKey);
+                            if (traceValue != null && int.TryParse(traceValue.ToString(), out int traceInt)) {
+                                _enableTraceLogging = (traceInt == 1);
+                            }
+
+                            // Read NoMFA group names and resolve to SIDs
+                            var groupNames = key.GetValue(_noMfaKey) as string;
+                            if (!string.IsNullOrEmpty(groupNames)) {
+                                foreach (var groupName in groupNames.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) {
+                                    string trimmedName = groupName.Trim();
+                                    try {
+                                        using (PrincipalContext ctx = new PrincipalContext(ContextType.Domain)) {
+                                            GroupPrincipal group = GroupPrincipal.FindByIdentity(ctx, trimmedName);
+                                            if (group != null) {
+                                                var sid = group.Sid.Value;
+                                                _noMfaGroupSids.Add(sid);
+                                                WriteEventLog(LogLevel.Information, $"NoMFA group added: {trimmedName} (SID: {sid})");
+                                            } else {
+                                                WriteEventLog(LogLevel.Warning, $"NoMFA group not found: {trimmedName}");
+                                            }
+                                        }
+                                    } catch (Exception ex) {
+                                        WriteEventLog(LogLevel.Warning, $"Error resolving group '{trimmedName}': {ex.Message}");
+                                    }
+                                }
+                            } else {
+                                WriteEventLog(LogLevel.Warning, "NoMfaGroups registry value is empty or missing.");
+                            }
+                        } else {
+                            WriteEventLog(LogLevel.Warning, $"Registry key not found: {_regPath}");
+                        }
+                    }
+                } catch (Exception ex) {
+                    WriteEventLog(LogLevel.Warning, $"Error reading registry during initialization: {ex.Message}");
+                }
             }
             return 0;
         }
@@ -50,7 +102,7 @@ namespace NpsWrapperNET {
         public static void RadiusExtensionTerm() {
             initCount--;
             if (initCount == 0) {
-                WriteEventLog(EventLogEntryType.Information, "RadiusExtensionInit called");
+                WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
             }
         }
         /// <summary>
@@ -61,7 +113,6 @@ namespace NpsWrapperNET {
         public static uint RadiusExtensionProcess2(IntPtr ecbPointer) {
             var control = new ExtensionControl(ecbPointer);
             string userName = string.Empty;
-
             /* 
              * Authorization request 
              *      -ExtensionPoint: Authorization
@@ -75,21 +126,54 @@ namespace NpsWrapperNET {
                      * If MFA returns OK keep original disposition -> AccessAccept disposition
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
-
                     logRequest(control);
                     userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
-                    
-
-                    bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
-                    if (resMfa) {
-                        /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
-                        control.ResponseType = RadiusCode.AccessAccept;
-                        WriteEventLog(EventLogEntryType.Information, $"MFA succeeded for user {userName}");
+                    // Check if user is in NoMFA group by SID
+                    bool skipMfa = false;
+                    try {
+                        PrincipalContext ctx;
+                        string samAccountName = userName;
+                        string domain = null;
+                        var parts = userName.Split('\\');
+                        if (parts.Length == 2) {
+                            domain = parts[0];
+                            samAccountName = parts[1];
+                            ctx = new PrincipalContext(ContextType.Domain, domain);
+                        } else {
+                            ctx = new PrincipalContext(ContextType.Domain);
+                        }
+                        using (ctx) {
+                            UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
+                            if (user != null) {
+                                var userGroups = user.GetAuthorizationGroups();
+                                foreach (var group in userGroups) {
+                                    var sid = group.Sid?.Value;
+                                    if (sid != null && _noMfaGroupSids.Contains(sid)) {
+                                        skipMfa = true;
+                                        WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                     }
-                    else {
-                        /* Set final disposition to AccessReject - Note that could be changed by other extensions */
-                        control.ResponseType = RadiusCode.AccessReject;
-                        WriteEventLog(EventLogEntryType.Warning, $"MFA failed for user {userName}");
+                    if (skipMfa) {
+                        control.ResponseType = RadiusCode.AccessAccept;
+                        // Logging moved to above, inside the group match
+                    } else {
+                        bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
+                        if (resMfa) {
+                            /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
+                            control.ResponseType = RadiusCode.AccessAccept;
+                            WriteEventLog(LogLevel.Information, $"MFA succeeded for user {userName}");
+                        }
+                        else {
+                            /* Set final disposition to AccessReject - Note that could be changed by other extensions */
+                            control.ResponseType = RadiusCode.AccessReject;
+                            WriteEventLog(LogLevel.Warning, $"MFA failed for user {userName}");
+                        }
                     }
                 }
             }
@@ -105,7 +189,7 @@ namespace NpsWrapperNET {
                 "-ResponseType: " + control.ResponseType.ToString()
             };
 
-            WriteEventLog(EventLogEntryType.Warning, "RadiusExtensionProcess2 called with params:", logMessage);
+            WriteEventLog(LogLevel.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
 
             var userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
             if (!string.IsNullOrEmpty(userName)) {
@@ -115,19 +199,19 @@ namespace NpsWrapperNET {
                 logMessage.Add("-Connection Request Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName));
                 logMessage.Add("-Network Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.PolicyName));
             }
-            WriteEventLog(EventLogEntryType.Warning, "Authorization request", logMessage);
+            WriteEventLog(LogLevel.Trace, "Authorization request", logMessage);
 
             string s = "";
             foreach (var attr in AttributesToList(control.Request)) {
                 s += " | " + attr;
             }
-            WriteEventLog(EventLogEntryType.Warning, $"Request components: {s}");
+            WriteEventLog(LogLevel.Trace, $"Request components: {s}");
 
             s = "";
             foreach (var attr in AttributesToList(control.Response[RadiusCode.AccessAccept])) {
                 s += " ~ " + attr;
             }
-            WriteEventLog(EventLogEntryType.Warning, $"Response components: {s}");
+            WriteEventLog(LogLevel.Trace, $"Response components: {s}");
         }
 
         private static string AttributeLookup(IList<RadiusAttribute> attributesList, RadiusAttributeType attributeType) {
@@ -155,13 +239,36 @@ namespace NpsWrapperNET {
         /// <param name="subj">Event first row</param>
         /// <param name="subj_body">Event additional rows to append</param>
         /// <param name="level">Event Level</param>
-        private static void WriteEventLog(EventLogEntryType level, string subj, List<string> subj_body = null) {
+        private static void WriteEventLog(LogLevel level, string subj, List<string> subj_body = null) {
+            EventLogEntryType winLevel;
+            switch (level) {
+                case LogLevel.Trace:
+                    if (!_enableTraceLogging) {
+                        return;
+                    }
+                    subj = "[TRACE] " + subj;
+                    winLevel = EventLogEntryType.Information;
+                    break;
+                case LogLevel.Information:
+                    winLevel = EventLogEntryType.Information;
+                    break;
+                case LogLevel.Warning:
+                    winLevel = EventLogEntryType.Warning;
+                    break;
+                case LogLevel.Error:
+                    winLevel = EventLogEntryType.Error;
+                    break;
+                default:
+                    winLevel = EventLogEntryType.Information;
+                    break;
+            }
+
             if (subj_body == null) {
                 subj_body = new List<string>();
             }
             using (EventLog eventLog = new EventLog("Application")) {
                 eventLog.Source = APP_NAME;
-                EventInstance eventInstance = new EventInstance(0, 0, level);
+                EventInstance eventInstance = new EventInstance(0, 0, winLevel);
                 var body = string.Join(Environment.NewLine, subj_body);
                 EventLog.WriteEvent(eventLog.Source, eventInstance, new List<string>() { subj + Environment.NewLine + body }.ToArray());
             }
