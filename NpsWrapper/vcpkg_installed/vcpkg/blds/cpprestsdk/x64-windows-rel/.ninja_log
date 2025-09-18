@@ -1,0 +1,27 @@
+# ninja log v6
+13	3362	7796462718433605	src/CMakeFiles/cpprest.dir/pch/stdafx.cpp.obj	8bd272e93a648431
+3371	4077	7796462751869854	src/CMakeFiles/cpprest.dir/http/common/http_helpers.cpp.obj	72629a6650c9ec29
+3366	4236	7796462751869854	src/CMakeFiles/cpprest.dir/http/client/http_client_msg.cpp.obj	39cb4c986bd1ab20
+3368	5360	7796462751869854	src/CMakeFiles/cpprest.dir/http/common/http_compression.cpp.obj	e0cd2f6210d1e62f
+4236	7161	7796462760622159	src/CMakeFiles/cpprest.dir/http/listener/http_listener_msg.cpp.obj	d26aaa567b1c559c
+3364	7602	7796462751869854	src/CMakeFiles/cpprest.dir/http/client/http_client.cpp.obj	2933a0805f9155e7
+5360	7643	7796462771871885	src/CMakeFiles/cpprest.dir/http/listener/http_server_api.cpp.obj	79c11217486ba5ab
+7644	11813	7796462794681697	src/CMakeFiles/cpprest.dir/json/json.cpp.obj	cdb4a23165e38aa1
+4078	12866	7796462759060533	src/CMakeFiles/cpprest.dir/http/listener/http_listener.cpp.obj	f09bfcd3a755d18f
+12866	14628	7796462848430244	src/CMakeFiles/cpprest.dir/json/json_serialization.cpp.obj	66d26a312634141e
+11813	15707	7796462836399538	src/CMakeFiles/cpprest.dir/json/json_parsing.cpp.obj	d003038d2f44b5c9
+3391	16851	7796462752181822	src/CMakeFiles/cpprest.dir/http/common/http_msg.cpp.obj	8ec013e6b0e1bea8
+15707	16930	7796462875307723	src/CMakeFiles/cpprest.dir/uri/uri_builder.cpp.obj	5267c097c9c93c59
+14629	17722	7796462864526723	src/CMakeFiles/cpprest.dir/uri/uri.cpp.obj	d4be327f6e59f340
+16931	17828	7796462887497437	src/CMakeFiles/cpprest.dir/utilities/base64.cpp.obj	3ad65799d48c591f
+7603	17944	7796462794216027	src/CMakeFiles/cpprest.dir/http/oauth/oauth2.cpp.obj	d041601119134d75
+16852	18175	7796462886711918	src/CMakeFiles/cpprest.dir/utilities/asyncrt_utils.cpp.obj	cab3eea961d4d13d
+17829	18196	7796462896558051	src/CMakeFiles/cpprest.dir/pplx/pplxwin.cpp.obj	a27aa5cd52fb4166
+17723	18312	7796462895464149	src/CMakeFiles/cpprest.dir/utilities/web_utilities.cpp.obj	cbd5f769f077e089
+7161	18976	7796462789840551	src/CMakeFiles/cpprest.dir/http/oauth/oauth1.cpp.obj	69f4911503768c7d
+18176	19142	7796462899997098	src/CMakeFiles/cpprest.dir/streams/fileio_win32.cpp.obj	65f5e751ce508630
+17944	24849	7796462897653903	src/CMakeFiles/cpprest.dir/http/client/http_client_winhttp.cpp.obj	2291e47fc6a83c58
+18197	25341	7796462900150310	src/CMakeFiles/cpprest.dir/http/listener/http_server_httpsys.cpp.obj	c736b115470551cc
+25342	25943	7796462977184620	Binaries/cpprest_2_10.dll	9ced078d68c732bc
+25342	25943	7796462977184620	Binaries/cpprest_2_10.lib	9ced078d68c732bc
+25944	26102	7796462977652030	CMakeFiles/install.util	77af3ffa3c9bf151

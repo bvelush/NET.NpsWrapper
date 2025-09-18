@@ -214,7 +214,9 @@ namespace OpenCymd.Nps.Plugin
         CRPPolicyName                  = 275,
         ProviderName                   = 276,
         ClearTextPassword              = 277,
-        SrcIPv6Address                 = 278
+        SrcIPv6Address                 = 278,
+
+        MS_RDGateway_ResourceId        = 2418
 // ReSharper restore InconsistentNaming
     }
 }

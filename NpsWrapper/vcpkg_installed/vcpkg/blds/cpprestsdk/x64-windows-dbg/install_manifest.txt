@@ -1,0 +1,6 @@
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/lib/cpprest_2_10d.lib
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/bin/cpprest_2_10d.dll
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/lib/share/cpprestsdk/cpprestsdk-config.cmake
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/lib/share/cpprestsdk/cpprestsdk-config-version.cmake
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/lib/share/cpprestsdk/cpprestsdk-targets.cmake
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/cpprestsdk_x64-windows/debug/lib/share/cpprestsdk/cpprestsdk-targets-debug.cmake

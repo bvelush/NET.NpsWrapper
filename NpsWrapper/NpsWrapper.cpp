@@ -183,6 +183,10 @@ VOID WINAPI RadiusExtensionTerm(VOID)
     }
 }
 
+
+#define RADIUS_ATTRIBUTE_VENDOR_SPECIFIC 26
+#define MICROSOFT_VENDOR_ID 311
+#define RDG_RESOURCE_ID_SUBTYPE 2418
 DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
 {
     LogEvent(LogLevel::Trace, "RadiusExtensionProcess2 called.");
@@ -190,6 +194,45 @@ DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
     {
         if (!g_initialized)
             Initialize();
+
+        PRADIUS_ATTRIBUTE_ARRAY pAttrArray = pECB->GetRequest(pECB);
+        if (pAttrArray)
+		{
+            DWORD attrCount = pAttrArray->GetSize(pAttrArray);
+            LogEvent(LogLevel::Trace, "Processing RADIUS attributes, there are " + attrCount.ToString());
+            for (DWORD i = 0; i < attrCount; ++i)
+            {
+                const RADIUS_ATTRIBUTE* pAttr = pAttrArray->AttributeAt(pAttrArray, i);
+                if (pAttr && pAttr->dwAttrType == RADIUS_ATTRIBUTE_VENDOR_SPECIFIC && pAttr->cbDataLength > 8)  
+                {
+                    const BYTE* pData = pAttr->lpValue; // Value pointer in the attribute
+                    // Vendor ID is 4 bytes, big-endian (RFC format)
+                    uint32_t vendorId = (pData[0] << 24) | (pData[1] << 16) | (pData[2] << 8) | pData[3];
+                    if (vendorId == MICROSOFT_VENDOR_ID)
+                    {
+                        // VSA format: [VendorID (4)][Vendor-Type (1)][Vendor-Length (1)][Value ...]
+                        BYTE vendorType = pData[4];
+				        LogEvent(LogLevel::Trace, String::Concat("Attribute ", i.ToString(), ", Length=", pAttr->cbDataLength.ToString(), " Subtype=", vendorType.ToString()));
+                        if (vendorType == RDG_RESOURCE_ID_SUBTYPE)
+                        {
+                            BYTE vendorLen = pData[5];
+                            // Value at pData+6, length vendorLen-2
+                            int valueLen = vendorLen - 2;
+                            if (valueLen > 0 && (6 + valueLen) <= (int)pAttr->cbDataLength)
+                            {
+                                // The value is usually a Unicode string (wchar_t), but may be ASCII.
+                                const wchar_t* wszResourceId = (const wchar_t*)(pData + 6);
+                                int wcharLen = valueLen / sizeof(wchar_t);
+                                std::wstring wsResourceId(wszResourceId, wcharLen);
+                                wprintf(L"RDG Resource ID MS-VSA 2418: %s\n", wsResourceId.c_str());
+								LogEvent(LogLevel::Information, String::Concat("RDG Resource ID MS-VSA 2418: ", msclr::interop::marshal_as<String^>(wsResourceId)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         DWORD result = NpsWrapperNET::NpsWrapper::RadiusExtensionProcess2(IntPtr(pECB));
         LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
         return result;

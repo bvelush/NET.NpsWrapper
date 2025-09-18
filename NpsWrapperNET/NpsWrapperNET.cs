@@ -5,15 +5,20 @@
 //   GNU General Public License version 2.1 (GPLv2.1) 
 // </copyright>
 // --------------------------------------------------------------------------------------------------------------------
-using System;
-using OpenCymd.Nps.Plugin;
-using System.Text;
-using System.Diagnostics;
-using System.Collections.Generic;
-using System.Linq;
-using AsyncAuthHandler;
-using System.DirectoryServices.AccountManagement;
 using Microsoft.Win32;
+using OpenCymd.Nps.Plugin;
+using OpenCymd.Nps.Plugin.Native;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.DirectoryServices.AccountManagement;
+using System.Linq;
+using System.Net.Http;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+//using System.Runtime.Serialization.Json;
 
 namespace NpsWrapperNET {
     public enum LogLevel {
@@ -31,7 +36,6 @@ namespace NpsWrapperNET {
 
         private static int initCount = 0;
         // Add a static field for the authenticator
-        private static Authenticator _authenticator;
         // Store NoMFA group SIDs
         private static HashSet<string> _noMfaGroupSids = new HashSet<string>();
         private static bool _enableTraceLogging = false;
@@ -51,7 +55,6 @@ namespace NpsWrapperNET {
             WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
             if (initCount == 0) {
                 initCount++;
-                _authenticator = new Authenticator();
                 try {
                     using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
                         if (key != null) {
@@ -112,6 +115,31 @@ namespace NpsWrapperNET {
         /// <returns>0 if all plugins were processed successfully or 5 (access denied) when at least one of the plugins failed.</returns>
         public static uint RadiusExtensionProcess2(IntPtr ecbPointer) {
             var control = new ExtensionControl(ecbPointer);
+
+            //// Get the attribute array pointer from the control block
+            //IntPtr attrArrayPtr = ecb.GetRequest(ecbPtr);
+
+            //// Define the RADIUS_ATTRIBUTE_ARRAY interface
+            //[UnmanagedFunctionPointer(CallingConvention.StdCall)]
+            //public delegate uint GetCountDelegate(IntPtr arrPtr);
+            //[UnmanagedFunctionPointer(CallingConvention.StdCall)]
+            //public delegate uint GetAtDelegate(IntPtr arrPtr, uint index, out IntPtr pAttr);
+
+            //// Get delegates from the vtable of attrArrayPtr...
+            //// (You may need to wrap in C++/CLI or use C# Unsafe code for this part)
+
+            //uint count = getCount(attrArrayPtr);
+            //for (uint i = 0; i < count; i++) {
+            //    IntPtr attrPtr;
+            //    getAt(attrArrayPtr, i, out attrPtr);
+            //    RADIUS_ATTRIBUTE attr = Marshal.PtrToStructure<RADIUS_ATTRIBUTE>(attrPtr);
+
+            //    if (attr.dwAttrType == 2418 /* ResourceId */) {
+            //        string resourceId = Marshal.PtrToStringUni(attr.pValue, (int)attr.cbValue / 2);
+            //        Console.WriteLine($"RDG ResourceId: {resourceId}");
+            //    }
+            //}
+
             string userName = string.Empty;
             /* 
              * Authorization request 
@@ -128,56 +156,39 @@ namespace NpsWrapperNET {
                      */
                     logRequest(control);
                     userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
-                    // Check if user is in NoMFA group by SID
-                    bool skipMfa = false;
+                    var resource = AttributeLookup(control.Request, RadiusAttributeType.MS_RDGateway_ResourceId);
+
+                    // Call REST API for MFA
+                    var requestId = Guid.NewGuid().ToString();
+                    var payload = new {
+                        request_id = requestId,
+                        samid = userName,
+                        requestor = "SMK"
+                    };
+
                     try {
-                        PrincipalContext ctx;
-                        string samAccountName = userName;
-                        string domain = null;
-                        var parts = userName.Split('\\');
-                        if (parts.Length == 2) {
-                            domain = parts[0];
-                            samAccountName = parts[1];
-                            ctx = new PrincipalContext(ContextType.Domain, domain);
-                        } else {
-                            ctx = new PrincipalContext(ContextType.Domain);
-                        }
-                        using (ctx) {
-                            UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
-                            if (user != null) {
-                                var userGroups = user.GetAuthorizationGroups();
-                                foreach (var group in userGroups) {
-                                    var sid = group.Sid?.Value;
-                                    if (sid != null && _noMfaGroupSids.Contains(sid)) {
-                                        skipMfa = true;
-                                        WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
-                                        break;
-                                    }
-                                }
-                            }
+                        using (var client = new HttpClient()) {
+                            var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                            var content = new StringContent(json, Encoding.UTF8, "application/json");
+                            //var response = client.PostAsync("http://localhost:8000/Authenticate", content).Result;
+                            //if (!response.IsSuccessStatusCode) {
+                            //    WriteEventLog(LogLevel.Error, $"MFA REST call failed: {response.StatusCode}");
+                            //    // Optionally override disposition here
+                            //}
+
+                            //var responseContent = response.Content.ReadAsStringAsync().Result;
+                            var sleepTime = 10; 
+                            System.Threading.Thread.Sleep(sleepTime * 1000);
+                            WriteEventLog(LogLevel.Trace, $"after sleep, {sleepTime}, {userName}, {resource}");
+                            control.ResponseType = RadiusCode.AccessAccept;
                         }
                     } catch (Exception ex) {
-                        WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
-                    }
-                    if (skipMfa) {
-                        control.ResponseType = RadiusCode.AccessAccept;
-                        // Logging moved to above, inside the group match
-                    } else {
-                        bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
-                        if (resMfa) {
-                            /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
-                            control.ResponseType = RadiusCode.AccessAccept;
-                            WriteEventLog(LogLevel.Information, $"MFA succeeded for user {userName}");
-                        }
-                        else {
-                            /* Set final disposition to AccessReject - Note that could be changed by other extensions */
-                            control.ResponseType = RadiusCode.AccessReject;
-                            WriteEventLog(LogLevel.Warning, $"MFA failed for user {userName}");
-                        }
+                        WriteEventLog(LogLevel.Error, $"MFA REST call exception: {ex.Message}");
+                        // Optionally override disposition here
                     }
                 }
             }
-            return 0;
+            return 0;  // control.ResponseType = RadiusCode.AccessAccept;
         }
 
         private static void logRequest(ExtensionControl control) {
@@ -198,6 +209,7 @@ namespace NpsWrapperNET {
                 logMessage.Add("-Src IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
                 logMessage.Add("-Connection Request Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName));
                 logMessage.Add("-Network Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.PolicyName));
+                logMessage.Add("==RDG Destination: " + AttributeLookup(control.Request, RadiusAttributeType.MS_RDGateway_ResourceId));
             }
             WriteEventLog(LogLevel.Trace, "Authorization request", logMessage);
 

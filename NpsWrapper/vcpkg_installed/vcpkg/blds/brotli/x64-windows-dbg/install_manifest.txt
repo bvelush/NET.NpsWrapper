@@ -1,0 +1,12 @@
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/tools/brotli/brotli.exe
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/brotlienc.lib
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/bin/brotlienc.dll
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/brotlidec.lib
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/bin/brotlidec.dll
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/brotlicommon.lib
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/bin/brotlicommon.dll
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/share/unofficial-brotli/unofficial-brotli-config.cmake
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/share/unofficial-brotli/unofficial-brotli-config-debug.cmake
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/pkgconfig/libbrotlicommon.pc
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/pkgconfig/libbrotlidec.pc
+C:/dd/NET.NpsWrapper/NpsWrapper/vcpkg_installed/vcpkg/pkgs/brotli_x64-windows/debug/lib/pkgconfig/libbrotlienc.pc
