@@ -79,9 +79,11 @@ namespace AsyncAuthHandler {
         }
 
         private enum AuthStatusEnum {
-            PENDING = 1,
-            SUCCESS = 2,
-            FAILURE = 3
+            FAILED = -2,
+            REJECTED = -1,
+            PENDING = 0,
+            AUTH_SUCCESS = 1,
+            PREAUTH_SUCCESS = 2
         }
 
         private class AuthResultResponse {
@@ -91,8 +93,8 @@ namespace AsyncAuthHandler {
         public async Task<bool> AuthenticateAsync(string samid) {
             try {
                 // TODO: lets generate requestid here, send auth request, then poll for result
-                var requestId = Guid.NewGuid().ToString();
-                var authRequestJson = JsonConvert.SerializeObject(new { request_id = requestId, samid = samid, requestor = "SMK-RDG" });
+                //var requestId = Guid.NewGuid().ToString();
+                var authRequestJson = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
                 WriteEventLog(LogLevel.Trace, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
                 var authenticateResponse = await _httpClient.PostAsync(
                     $"{_serviceUrl}/Authenticate", 
@@ -111,20 +113,19 @@ namespace AsyncAuthHandler {
                     WriteEventLog(LogLevel.Error, $"Invalid response from service for user: {samid}");
                     return false;
                 }
-                if (authenticateResponseObj.status == AuthStatusEnum.FAILURE) { // early answer, no need of polling
-                    WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid} without polling");
+                if (authenticateResponseObj.status < 0) { // early answer, no need of polling
+                    WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid} without polling, status: {authenticateResponseObj.status}");
                     return false;
+                }
+                if (authenticateResponseObj.status > 0) { // early success, no need of polling
+                    WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid} without polling, status: {authenticateResponseObj.status}");
+                    return true;
                 }
 
-                if (string.IsNullOrEmpty(requestId)) {
-                    WriteEventLog(LogLevel.Error, $"Incorrect response: No request_id received for user: {samid}");
-                    return false;
-                }
-                WriteEventLog(LogLevel.Trace, $"Received request_id: {requestId} for user: {samid}");
                 await Task.Delay(_waitBeforePoll * 1000);
                 for (int i = 0; i < _pollMaxSeconds; i++) {
                     try {
-                        WriteEventLog(LogLevel.Trace, $"Polling AuthResult for user: {samid}, request_id: {requestId}, attempt: {i + 1}");
+                        WriteEventLog(LogLevel.Trace, $"Polling AuthResult for user: {samid}, attempt: {i + 1}");
                         var authResultResponse = await _httpClient.PostAsync(
                             $"{_serviceUrl}/AuthResult",
                             new StringContent(authRequestJson, Encoding.UTF8, "application/json")
@@ -135,17 +136,17 @@ namespace AsyncAuthHandler {
                             return false;
                         }
                         var authResultResponseJson = JsonConvert.DeserializeObject<AuthResultResponse>(authResultResponseContent);
-                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, request_id: {requestId}, response: {authResultResponseContent}");
+                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, response: {authResultResponseContent}");
                         if (authResultResponseJson == null) {
-                            WriteEventLog(LogLevel.Error, $"Invalid AuthResult response for request_id: {requestId}");
+                            WriteEventLog(LogLevel.Error, $"Invalid AuthResult response for user {samid}");
                             return false;
                         }
-                        if (authResultResponseJson.status == AuthStatusEnum.SUCCESS) { // auth success
-                            WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid}, request_id: {requestId}");
+                        if (authResultResponseJson.status > 0) { // auth success
+                            WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid}");
                             return true;
                         }
-                        if (authResultResponseJson.status == AuthStatusEnum.FAILURE) { // auth failure
-                            WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid}, request_id: {requestId}");
+                        if (authResultResponseJson.status < 0) { // auth failure
+                            WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid}");
                             return false;
                         }
                         // result == 1 (pending), continue polling
@@ -165,7 +166,7 @@ namespace AsyncAuthHandler {
                     }
                     await Task.Delay(1000); // Wait 1 second before next poll
                 }
-                WriteEventLog(LogLevel.Error, $"Authentication result not received in time for user: {samid}, request_id: {requestId}");
+                WriteEventLog(LogLevel.Error, $"Authentication result not received in time for user: {samid}");
                 return false;
             }
             catch (TaskCanceledException ex) {
