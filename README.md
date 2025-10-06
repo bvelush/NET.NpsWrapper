@@ -5,6 +5,34 @@ New-EventLog -LogName Application -Source "NPS-Wrapper.NET"
 New-EventLog -LogName Application -Source "NPS-AsyncAuthHandler"
 ```
 
+Modifying .NET for TLS v1.2:
+```PowerShell
+# Enable TLS 1.2 for .NET 4.7.2
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319" -Name "SchUseStrongCrypto" -Value 1 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319" -Name "SchUseStrongCrypto" -Value 1 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319" -Name "SystemDefaultTlsVersions" -Value 1 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319" -Name "SystemDefaultTlsVersions" -Value 1 -Type DWord
+```
+
+Registry settings:
+```reg
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
+"NoMfaGroups"="SMK\\tsg-direct;SMK\\TSG NO MFA"
+"EnableTraceLogging"=dword:00000001
+"AuthTimeout"=dword:0000003c
+"ServiceUrl"="https://auth.smk:8443"
+"WaitBeforePoll"=dword:0000000a
+"PollInterval"=dword:00000001
+"PollMaxSeconds"=dword:0000005a
+"IgnoreSslErrors"=dword:00000001
+"BasicAuthUserName"="<username>"
+"BasicAuthPassword"="<password>"
+
+
+```
+
 # Deploy
 
 run deploy.cmd
