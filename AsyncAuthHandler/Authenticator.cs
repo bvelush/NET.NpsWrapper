@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
 
 namespace AsyncAuthHandler {
     public enum LogLevel {
@@ -26,6 +28,9 @@ namespace AsyncAuthHandler {
         private int _pollInterval = 1; // seconds
         private int _pollMaxSeconds = 60; // seconds
         private bool _enableTraceLogging = false;
+        private bool _ignoreSslErrors = false;
+        private string _basicAuthUsername = "";
+        private string _basicAuthPassword = "";
 
         private const string _regPath = @"SOFTWARE\NpsWrapperNET";
         private const string _authTimeoutKey = "AuthTimeout";
@@ -34,6 +39,9 @@ namespace AsyncAuthHandler {
         private const string _pollIntervalKey = "PollInterval";
         private const string _pollMaxSecondsKey = "PollMaxSeconds";
         private const string _enableTraceLoggingKey = "EnableTraceLogging";
+        private const string _ignoreSslErrorsKey = "IgnoreSslErrors";
+        private const string _basicAuthUsernameKey = "BasicAuthUsername";
+        private const string _basicAuthPasswordKey = "BasicAuthPassword";
 
         public Authenticator() {
             // Read settings from registry
@@ -46,14 +54,38 @@ namespace AsyncAuthHandler {
                         _pollInterval = GetIntRegistryValue(key, _pollIntervalKey, 1);
                         _pollMaxSeconds = GetIntRegistryValue(key, _pollMaxSecondsKey, 60);
                         _enableTraceLogging = GetBoolRegistryValue(key, _enableTraceLoggingKey, false);
+                        _ignoreSslErrors = GetBoolRegistryValue(key, _ignoreSslErrorsKey, false);
+                        _basicAuthUsername = GetStringRegistryValue(key, _basicAuthUsernameKey, "");
+                        _basicAuthPassword = GetStringRegistryValue(key, _basicAuthPasswordKey, "");
                     }
                 }
             } catch (Exception ex) {
                 WriteEventLog(LogLevel.Warning, $"Error reading settings from registry: {ex.Message}");
             }
 
-            _httpClient = new HttpClient();
+            // Create HttpClientHandler with SSL and auth configuration
+            var handler = new HttpClientHandler();
+            
+            // Configure SSL certificate validation
+            if (_ignoreSslErrors) {
+                handler.ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => {
+                    WriteEventLog(LogLevel.Warning, "SSL certificate validation bypassed due to IgnoreSslErrors setting");
+                    return true; // Accept all certificates
+                };
+                WriteEventLog(LogLevel.Information, "SSL certificate validation disabled");
+            }
+
+            _httpClient = new HttpClient(handler);
             _httpClient.Timeout = TimeSpan.FromSeconds(_authTimeout);
+
+            // Configure basic authentication if credentials are provided
+            if (!string.IsNullOrEmpty(_basicAuthUsername) && !string.IsNullOrEmpty(_basicAuthPassword)) {
+                var authValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_basicAuthUsername}:{_basicAuthPassword}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
+                WriteEventLog(LogLevel.Information, $"Basic authentication configured for user: {_basicAuthUsername}");
+            }
+
+            WriteEventLog(LogLevel.Information, $"Authenticator initialized with service URL: {_serviceUrl}");
         }
 
         private int GetIntRegistryValue(RegistryKey key, string valueName, int defaultValue)
@@ -79,9 +111,11 @@ namespace AsyncAuthHandler {
         }
 
         private enum AuthStatusEnum {
-            PENDING = 1,
-            SUCCESS = 2,
-            FAILURE = 3
+            FAILED = -2,
+            REJECTED = -1,
+            PENDING = 0,
+            AUTH_SUCCESS = 1,
+            PREAUTH_SUCCESS = 2
         }
 
         private class AuthResultResponse {
@@ -91,8 +125,8 @@ namespace AsyncAuthHandler {
         public async Task<bool> AuthenticateAsync(string samid) {
             try {
                 // TODO: lets generate requestid here, send auth request, then poll for result
-                var requestId = Guid.NewGuid().ToString();
-                var authRequestJson = JsonConvert.SerializeObject(new { request_id = requestId, samid = samid, requestor = "SMK-RDG" });
+                //var requestId = Guid.NewGuid().ToString();
+                var authRequestJson = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
                 WriteEventLog(LogLevel.Trace, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
                 var authenticateResponse = await _httpClient.PostAsync(
                     $"{_serviceUrl}/Authenticate", 
@@ -111,20 +145,19 @@ namespace AsyncAuthHandler {
                     WriteEventLog(LogLevel.Error, $"Invalid response from service for user: {samid}");
                     return false;
                 }
-                if (authenticateResponseObj.status == AuthStatusEnum.FAILURE) { // early answer, no need of polling
-                    WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid} without polling");
+                if (authenticateResponseObj.status < 0) { // early answer, no need of polling
+                    WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid} without polling, status: {authenticateResponseObj.status}");
                     return false;
+                }
+                if (authenticateResponseObj.status > 0) { // early success, no need of polling
+                    WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid} without polling, status: {authenticateResponseObj.status}");
+                    return true;
                 }
 
-                if (string.IsNullOrEmpty(requestId)) {
-                    WriteEventLog(LogLevel.Error, $"Incorrect response: No request_id received for user: {samid}");
-                    return false;
-                }
-                WriteEventLog(LogLevel.Trace, $"Received request_id: {requestId} for user: {samid}");
                 await Task.Delay(_waitBeforePoll * 1000);
                 for (int i = 0; i < _pollMaxSeconds; i++) {
                     try {
-                        WriteEventLog(LogLevel.Trace, $"Polling AuthResult for user: {samid}, request_id: {requestId}, attempt: {i + 1}");
+                        WriteEventLog(LogLevel.Trace, $"Polling AuthResult for user: {samid}, attempt: {i + 1}");
                         var authResultResponse = await _httpClient.PostAsync(
                             $"{_serviceUrl}/AuthResult",
                             new StringContent(authRequestJson, Encoding.UTF8, "application/json")
@@ -135,49 +168,49 @@ namespace AsyncAuthHandler {
                             return false;
                         }
                         var authResultResponseJson = JsonConvert.DeserializeObject<AuthResultResponse>(authResultResponseContent);
-                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, request_id: {requestId}, response: {authResultResponseContent}");
+                        WriteEventLog(LogLevel.Trace, $"Polled AuthResult for user: {samid}, response: {authResultResponseContent}");
                         if (authResultResponseJson == null) {
-                            WriteEventLog(LogLevel.Error, $"Invalid AuthResult response for request_id: {requestId}");
+                            WriteEventLog(LogLevel.Error, $"Invalid AuthResult response for user {samid}");
                             return false;
                         }
-                        if (authResultResponseJson.status == AuthStatusEnum.SUCCESS) { // auth success
-                            WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid}, request_id: {requestId}");
+                        if (authResultResponseJson.status > 0) { // auth success
+                            WriteEventLog(LogLevel.Trace, $"Authentication succeeded for user: {samid}");
                             return true;
                         }
-                        if (authResultResponseJson.status == AuthStatusEnum.FAILURE) { // auth failure
-                            WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid}, request_id: {requestId}");
+                        if (authResultResponseJson.status < 0) { // auth failure
+                            WriteEventLog(LogLevel.Trace, $"Authentication failed for user: {samid}");
                             return false;
                         }
                         // result == 1 (pending), continue polling
                         await Task.Delay(_pollInterval * 1000);
                     }
                     catch (TaskCanceledException ex) {
-                        WriteEventLog(LogLevel.Error, $"Timeout reached while polling AuthResult for user {samid}: {ex.Message}");
+                        WriteEventLog(LogLevel.Error, $"Timeout reached while polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     catch (HttpRequestException ex) {
-                        WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while polling AuthResult for user {samid}: {ex.Message}");
+                        WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     catch (Exception ex) {
-                        WriteEventLog(LogLevel.Error, $"Error polling AuthResult for user {samid}: {ex.Message}, {ex.StackTrace}");
+                        WriteEventLog(LogLevel.Error, $"Error polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     await Task.Delay(1000); // Wait 1 second before next poll
                 }
-                WriteEventLog(LogLevel.Error, $"Authentication result not received in time for user: {samid}, request_id: {requestId}");
+                WriteEventLog(LogLevel.Error, $"Authentication result not received in time for user: {samid}");
                 return false;
             }
             catch (TaskCanceledException ex) {
-                WriteEventLog(LogLevel.Error, $"Timeout reached while authenticating user {samid}: {ex.Message}");
+                WriteEventLog(LogLevel.Error, $"Timeout reached while authenticating user {samid}", ex);
                 return false;
             }
             catch (HttpRequestException ex) {
-                WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while authenticating user {samid}: {ex.Message}");
+                WriteEventLog(LogLevel.Error, $"MFA Service is unreachable while authenticating user {samid}", ex);
                 return false;
             }
             catch (Exception ex) {
-                WriteEventLog(LogLevel.Error, $"Error authenticating user {samid}: {ex.Message}, {ex.StackTrace}");
+                WriteEventLog(LogLevel.Error, $"Error authenticating user {samid}", ex);
                 return false;
             }
         }
@@ -215,6 +248,54 @@ namespace AsyncAuthHandler {
                 var body = string.Join(Environment.NewLine, subj_body);
                 EventLog.WriteEvent(eventLog.Source, eventInstance, new List<string>() { subj + Environment.NewLine + body }.ToArray());
             }
+        }
+
+        private void WriteEventLog(LogLevel level, string subj, Exception ex) {
+            var exceptionDetails = new List<string>();
+            
+            // Unwrap all exception details
+            Exception currentEx = ex;
+            int level_depth = 0;
+            while (currentEx != null) {
+                var prefix = level_depth == 0 ? "Exception" : $"Inner Exception [{level_depth}]";
+                exceptionDetails.Add($"{prefix}: {currentEx.GetType().FullName}");
+                exceptionDetails.Add($"Message: {currentEx.Message}");
+                
+                if (currentEx is HttpRequestException httpEx) {
+                    // Add specific HttpRequestException details
+                    exceptionDetails.Add($"HttpRequestException.HResult: 0x{currentEx.HResult:X8} ({currentEx.HResult})");
+                    if (httpEx.Data != null && httpEx.Data.Count > 0) {
+                        exceptionDetails.Add("HttpRequestException.Data:");
+                        foreach (var key in httpEx.Data.Keys) {
+                            exceptionDetails.Add($"  {key}: {httpEx.Data[key]}");
+                        }
+                    }
+                }
+                
+                if (currentEx is WebException webEx) {
+                    // Add specific WebException details
+                    exceptionDetails.Add($"WebException.Status: {webEx.Status}");
+                    if (webEx.Response != null) {
+                        exceptionDetails.Add($"WebException.Response: {webEx.Response}");
+                    }
+                }
+                
+                exceptionDetails.Add($"Source: {currentEx.Source ?? "N/A"}");
+                exceptionDetails.Add($"HResult: 0x{currentEx.HResult:X8} ({currentEx.HResult})");
+                
+                if (!string.IsNullOrEmpty(currentEx.StackTrace)) {
+                    exceptionDetails.Add($"StackTrace: {currentEx.StackTrace}");
+                }
+                
+                currentEx = currentEx.InnerException;
+                level_depth++;
+                
+                if (currentEx != null) {
+                    exceptionDetails.Add(""); // Add separator line between exceptions
+                }
+            }
+            
+            WriteEventLog(level, subj, exceptionDetails);
         }
     }
 }
