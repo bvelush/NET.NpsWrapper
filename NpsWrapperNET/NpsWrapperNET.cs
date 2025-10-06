@@ -35,12 +35,15 @@ namespace NpsWrapperNET {
         // Store NoMFA group SIDs
         private static HashSet<string> _noMfaGroupSids = new HashSet<string>();
         private static bool _enableTraceLogging = false;
+        // Store MFA-enabled NPS policy name
+        private static string _mfaEnabledNpsPolicy = string.Empty;
         // Registry path and value name for NoMFA groups
         // [HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
         // "NoMfaGroups"="Group1;Group2;Group3"
         private const string _regPath = @"SOFTWARE\\NpsWrapperNET";
         private const string _noMfaKey = "NoMfaGroups";
         private const string _enableTraceLoggingKey = "EnableTraceLogging";
+        private const string _mfaEnabledNpsPolicyKey = "MfaEnabledNPSPolicy";
 
         /// <summary>
         /// <para>Called by NPS while the service is starting up</para>
@@ -59,6 +62,15 @@ namespace NpsWrapperNET {
                             var traceValue = key.GetValue(_enableTraceLoggingKey);
                             if (traceValue != null && int.TryParse(traceValue.ToString(), out int traceInt)) {
                                 _enableTraceLogging = (traceInt == 1);
+                            }
+
+                            // Read MFA-enabled NPS policy name
+                            var mfaPolicyValue = key.GetValue(_mfaEnabledNpsPolicyKey) as string;
+                            if (!string.IsNullOrEmpty(mfaPolicyValue)) {
+                                _mfaEnabledNpsPolicy = mfaPolicyValue.Trim();
+                                WriteEventLog(LogLevel.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
+                            } else {
+                                WriteEventLog(LogLevel.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
                             }
 
                             // Read NoMFA group names and resolve to SIDs
@@ -127,38 +139,51 @@ namespace NpsWrapperNET {
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
                     logRequest(control);
-                    userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
-                    // Check if user is in NoMFA group by SID
                     bool skipMfa = false;
-                    try {
-                        PrincipalContext ctx;
-                        string samAccountName = userName;
-                        string domain = null;
-                        var parts = userName.Split('\\');
-                        if (parts.Length == 2) {
-                            domain = parts[0];
-                            samAccountName = parts[1];
-                            ctx = new PrincipalContext(ContextType.Domain, domain);
-                        } else {
-                            ctx = new PrincipalContext(ContextType.Domain);
-                        }
-                        using (ctx) {
-                            UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
-                            if (user != null) {
-                                var userGroups = user.GetAuthorizationGroups();
-                                foreach (var group in userGroups) {
-                                    var sid = group.Sid?.Value;
-                                    if (sid != null && _noMfaGroupSids.Contains(sid)) {
-                                        skipMfa = true;
-                                        WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
-                                        break;
+                    var policyName = AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName);
+                    
+                    // Check if current policy matches the MFA-enabled policy (case-insensitive)
+                    if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy) && 
+                        !string.IsNullOrEmpty(policyName) && 
+                        string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
+                        skipMfa = true;
+                        WriteEventLog(LogLevel.Information, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
+                    }
+                    
+                    if (!skipMfa) {
+                        try {
+                            userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
+                            // Check if user is in NoMFA group by SID
+                            PrincipalContext ctx;
+                            string samAccountName = userName;
+                            string domain = null;
+                            var parts = userName.Split('\\');
+                            if (parts.Length == 2) {
+                                domain = parts[0];
+                                samAccountName = parts[1];
+                                ctx = new PrincipalContext(ContextType.Domain, domain);
+                            } else {
+                                ctx = new PrincipalContext(ContextType.Domain);
+                            }
+                            using (ctx) {
+                                UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
+                                if (user != null) {
+                                    var userGroups = user.GetAuthorizationGroups();
+                                    foreach (var group in userGroups) {
+                                        var sid = group.Sid?.Value;
+                                        if (sid != null && _noMfaGroupSids.Contains(sid)) {
+                                            skipMfa = true;
+                                            WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
+                                            break;
+                                        }
                                     }
                                 }
                             }
+                        } catch (Exception ex) {
+                            WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
-                    } catch (Exception ex) {
-                        WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                     }
+                    
                     if (skipMfa) {
                         control.ResponseType = RadiusCode.AccessAccept;
                         // Logging moved to above, inside the group match
