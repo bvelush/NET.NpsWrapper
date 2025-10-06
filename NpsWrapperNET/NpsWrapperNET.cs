@@ -139,20 +139,16 @@ namespace NpsWrapperNET {
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
                     logRequest(control);
-                    bool skipMfa = false;
-                    var policyName = AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName);
-                    
-                    // Check if current policy matches the MFA-enabled policy (case-insensitive)
-                    if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy) && 
-                        !string.IsNullOrEmpty(policyName) && 
+                    bool performMfa = true;
+                    var policyName = AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
+                    // Either no MFA policy configured, no current policy is defined, or policies match - perform MFA
+                    if (string.IsNullOrEmpty(_mfaEnabledNpsPolicy) || 
+                        string.IsNullOrEmpty(policyName) || 
                         string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
-                        skipMfa = true;
-                        WriteEventLog(LogLevel.Information, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
-                    }
-                    
-                    if (!skipMfa) {
+
+                        WriteEventLog(LogLevel.Trace, $"MFA will be performed: MfaPolicy='{_mfaEnabledNpsPolicy}', CurrentPolicy='{policyName}'");
                         try {
-                            userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
+                            userName = AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
                             // Check if user is in NoMFA group by SID
                             PrincipalContext ctx;
                             string samAccountName = userName;
@@ -162,7 +158,8 @@ namespace NpsWrapperNET {
                                 domain = parts[0];
                                 samAccountName = parts[1];
                                 ctx = new PrincipalContext(ContextType.Domain, domain);
-                            } else {
+                            }
+                            else {
                                 ctx = new PrincipalContext(ContextType.Domain);
                             }
                             using (ctx) {
@@ -172,22 +169,24 @@ namespace NpsWrapperNET {
                                     foreach (var group in userGroups) {
                                         var sid = group.Sid?.Value;
                                         if (sid != null && _noMfaGroupSids.Contains(sid)) {
-                                            skipMfa = true;
+                                            performMfa = false;
                                             WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
                                             break;
                                         }
                                     }
                                 }
                             }
-                        } catch (Exception ex) {
+                        }
+                        catch (Exception ex) {
                             WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
+                    } else {
+                        // Policies don't match - skip MFA
+                        performMfa = false;
+                        WriteEventLog(LogLevel.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy: '{_mfaEnabledNpsPolicy}', skipping MFA.");
                     }
                     
-                    if (skipMfa) {
-                        control.ResponseType = RadiusCode.AccessAccept;
-                        // Logging moved to above, inside the group match
-                    } else {
+                    if (performMfa) {
                         bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
                         if (resMfa) {
                             /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
@@ -199,10 +198,20 @@ namespace NpsWrapperNET {
                             control.ResponseType = RadiusCode.AccessReject;
                             WriteEventLog(LogLevel.Warning, $"MFA failed for user {userName}");
                         }
+                    } else {
+                        control.ResponseType = RadiusCode.AccessAccept;
+                        WriteEventLog(LogLevel.Information, $"MFA skipped for user {userName}, accepting request.");
                     }
                 }
             }
             return 0;
+        }
+
+        private static string sanitizeString(string input) {
+            // for some reason, stirng.Trim() does not remove trailing \0 char
+            if (input[input.Length - 1] == '\0')
+                return input.Substring(0, input.Length - 1); // Remove trailing char
+            return input.Trim();
         }
 
         private static void logRequest(ExtensionControl control) {
@@ -221,20 +230,21 @@ namespace NpsWrapperNET {
                 logMessage.Add("-UserName: " + userName);
                 logMessage.Add("-NAS IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.NASIPAddress));
                 logMessage.Add("-Src IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
-                logMessage.Add("-Connection Request Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName));
-                logMessage.Add("-Network Policy Name: " + AttributeLookup(control.Request, RadiusAttributeType.PolicyName));
+                logMessage.Add($"-Connection Request Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName)}'");
+                logMessage.Add($"-Network Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.PolicyName)}'");
             }
             WriteEventLog(LogLevel.Trace, "Authorization request", logMessage);
 
             string s = "";
             foreach (var attr in AttributesToList(control.Request)) {
-                s += " | " + attr;
+                s += " | " + sanitizeString(attr);
             }
             WriteEventLog(LogLevel.Trace, $"Request components: {s}");
 
+
             s = "";
             foreach (var attr in AttributesToList(control.Response[RadiusCode.AccessAccept])) {
-                s += " ~ " + attr;
+                s += " ~ " + sanitizeString(attr);
             }
             WriteEventLog(LogLevel.Trace, $"Response components: {s}");
         }
@@ -243,7 +253,8 @@ namespace NpsWrapperNET {
             var a = attributesList.FirstOrDefault(x => x.AttributeId.Equals((int)attributeType));
             if (a == null)
                 return string.Empty;
-            return (a.Value is byte[] val) ? Encoding.Default.GetString(val) : a.Value.ToString();
+            var ret_val = (a.Value is byte[] val) ? Encoding.Default.GetString(val) : a.Value.ToString();
+            return sanitizeString(ret_val);
         }
         /* Get all attributes*/
         private static List<string> AttributesToList(IList<RadiusAttribute> attributesList) {

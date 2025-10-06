@@ -29,8 +29,7 @@ Windows Registry Editor Version 5.00
 "IgnoreSslErrors"=dword:00000001
 "BasicAuthUserName"="<username>"
 "BasicAuthPassword"="<password>"
-
-
+"MfaEnabledNPSPolicy"="Name of NPS policy that needs MFA"
 ```
 
 # Deploy
