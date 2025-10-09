@@ -19,17 +19,17 @@ Registry settings:
 Windows Registry Editor Version 5.00
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
-"NoMfaGroups"="SMK\\tsg-direct;SMK\\TSG NO MFA"
-"EnableTraceLogging"=dword:00000001
 "AuthTimeout"=dword:0000003c
-"ServiceUrl"="https://auth.smk:8443"
-"WaitBeforePoll"=dword:0000000a
+"BasicAuthPassword"="<password>"
+"BasicAuthUserName"="<username>"
+"EnableTraceLogging"=dword:00000001
+"IgnoreSslErrors"=dword:00000001
+"MfaEnabledNPSPolicy"="Name of NPS policy that needs MFA"
+"NoMfaGroups"="SMK\\tsg-direct;SMK\\TSG NO MFA"
 "PollInterval"=dword:00000001
 "PollMaxSeconds"=dword:0000005a
-"IgnoreSslErrors"=dword:00000001
-"BasicAuthUserName"="<username>"
-"BasicAuthPassword"="<password>"
-"MfaEnabledNPSPolicy"="Name of NPS policy that needs MFA"
+"ServiceUrl"="https://auth.smk:8443"
+"WaitBeforePoll"=dword:0000000a
 ```
 
 # Deploy
