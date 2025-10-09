@@ -117,13 +117,34 @@ Assembly^ LocalAssemblyResolver(Object^ sender, ResolveEventArgs^ args)
     }
 }
 
+// Get module information for logging
+System::String^ GetModuleInfo()
+{
+    try
+    {
+        System::String^ modulePath = Assembly::GetExecutingAssembly()->Location;
+        if (File::Exists(modulePath))
+        {
+            FileInfo^ fileInfo = gcnew FileInfo(modulePath);
+            return String::Format("({0}, {1} bytes)", 
+                fileInfo->LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"), 
+                fileInfo->Length);
+        }
+        return "(info unavailable)";
+    }
+    catch (Exception^)
+    {
+        return "(info unavailable)";
+    }
+}
+
 // Use a static variable to track initialization
 void Initialize()
 {
     try
     {
         ReadTraceLoggingSetting();
-        LogEvent(LogLevel::Information, "Initializing NpsWrapper...");
+        LogEvent(LogLevel::Information, String::Format("Initializing NpsWrapper {0}", GetModuleInfo()));
         AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = true;
         LogEvent(LogLevel::Information, "NpsWrapper initialized.");

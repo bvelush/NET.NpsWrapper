@@ -6,7 +6,10 @@
 param(
     [Parameter(Mandatory=$false)]
     [ValidateSet("Debug", "Release")]
-    [string]$BuildType = "Debug"
+    [string]$BuildType = "Debug",
+    
+    [Parameter(Mandatory=$false)]
+    [switch]$Update
 )
 
 # Check if running as Administrator
@@ -18,6 +21,11 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Write-Host "NPS Plugin Deployment Script" -ForegroundColor Green
 Write-Host "=============================" -ForegroundColor Green
 Write-Host "Build Type: $BuildType" -ForegroundColor Yellow
+if ($Update) {
+    Write-Host "Mode: Update (files only)" -ForegroundColor Magenta
+} else {
+    Write-Host "Mode: Full deployment" -ForegroundColor Yellow
+}
 Write-Host ""
 
 # Function to create registry key if it doesn't exist
@@ -123,34 +131,52 @@ function Read-SecurePassword {
     return $securePassword
 }
 
-# Collect user input for required settings
-Write-Host "Please provide the following configuration settings:" -ForegroundColor Yellow
-Write-Host ""
+# Collect user input for required settings (skip in update mode)
+if (-not $Update) {
+    Write-Host "Please provide the following configuration settings:" -ForegroundColor Yellow
+    Write-Host ""
 
-$basicAuthUserName = Read-Host "Enter BasicAuth Username"
-$basicAuthPassword = Read-SecurePassword "Enter BasicAuth Password: "
-$basicAuthPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($basicAuthPassword))
+    $basicAuthUserName = Read-Host "Enter BasicAuth Username"
+    $basicAuthPassword = Read-SecurePassword "Enter BasicAuth Password: "
+    $basicAuthPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($basicAuthPassword))
 
-$serviceUrl = Read-Host "Enter Service URL (e.g., https://auth.example.com:8443)"
-$mfaEnabledPolicy = Read-Host "Enter MFA-enabled NPS Policy Name"
+    $serviceUrl = Read-Host "Enter Service URL (e.g., https://auth.example.com:8443)"
+    $mfaEnabledPolicy = Read-Host "Enter MFA-enabled NPS Policy Name"
 
-Write-Host ""
-Write-Host "Configuration Summary:" -ForegroundColor Yellow
-Write-Host "  Username: $basicAuthUserName"
-Write-Host "  Password: $("*" * 25)" -ForegroundColor Yellow
-Write-Host "  Service URL: $serviceUrl"
-Write-Host "  MFA Policy: $mfaEnabledPolicy"
-Write-Host ""
+    Write-Host ""
+    Write-Host "Configuration Summary:" -ForegroundColor Yellow
+    Write-Host "  Username: $basicAuthUserName"
+    Write-Host "  Password: $("*" * 25)" -ForegroundColor Yellow
+    Write-Host "  Service URL: $serviceUrl"
+    Write-Host "  MFA Policy: $mfaEnabledPolicy"
+    Write-Host ""
 
-$confirm = Read-Host "Continue with deployment? (y/N)"
-if ($confirm -ne 'y' -and $confirm -ne 'Y') {
-    Write-Host "Deployment cancelled." -ForegroundColor Red
-    exit 0
+    $confirm = Read-Host "Continue with deployment? (y/N)"
+    if ($confirm -ne 'y' -and $confirm -ne 'Y') {
+        Write-Host "Deployment cancelled." -ForegroundColor Red
+        exit 0
+    }
+} else {
+    Write-Host "Update mode: Skipping configuration input and registry settings." -ForegroundColor Cyan
+    Write-Host ""
 }
 
 try {
     # Step 1: Stop IAS (Internet Authentication Service/NPS) service
     Write-Host "Stopping IAS service..." -ForegroundColor Yellow
+    
+    # Check if RDG (Remote Desktop Gateway) service is running before stopping IAS
+    $rdgWasRunning = $false
+    try {
+        $rdgService = Get-Service -Name "TSGateway" -ErrorAction SilentlyContinue
+        if ($rdgService -and $rdgService.Status -eq 'Running') {
+            $rdgWasRunning = $true
+            Write-Host "Remote Desktop Gateway service is running - will be restarted after deployment." -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "Remote Desktop Gateway service not found or not accessible." -ForegroundColor Cyan
+    }
+    
     Stop-Service -Name "IAS" -Force -ErrorAction Stop
     Write-Host "IAS service stopped successfully." -ForegroundColor Green
     
@@ -231,127 +257,173 @@ try {
     
     Write-Host "File deployment completed successfully." -ForegroundColor Green
 
-    # Step 3: Create Event Log sources
-    Write-Host "Creating Event Log sources..." -ForegroundColor Yellow
-    
-    $eventSources = @("NPS-Wrapper", "NPS-Wrapper.NET", "NPS-AsyncAuthHandler")
-    foreach ($source in $eventSources) {
-        try {
-            if (![System.Diagnostics.EventLog]::SourceExists($source)) {
-                New-EventLog -LogName Application -Source $source
-                Write-Host "Created Event Log source: $source" -ForegroundColor Green
-            } else {
-                Write-Host "Event Log source already exists: $source" -ForegroundColor Cyan
+    if (-not $Update) {
+        # Step 3: Create Event Log sources
+        Write-Host "Creating Event Log sources..." -ForegroundColor Yellow
+        
+        $eventSources = @("NPS-Wrapper", "NPS-Wrapper.NET", "NPS-AsyncAuthHandler")
+        foreach ($source in $eventSources) {
+            try {
+                if (![System.Diagnostics.EventLog]::SourceExists($source)) {
+                    New-EventLog -LogName Application -Source $source
+                    Write-Host "Created Event Log source: $source" -ForegroundColor Green
+                } else {
+                    Write-Host "Event Log source already exists: $source" -ForegroundColor Cyan
+                }
+            } catch {
+                Write-Warning "Failed to create Event Log source: $source - $($_.Exception.Message)"
             }
-        } catch {
-            Write-Warning "Failed to create Event Log source: $source - $($_.Exception.Message)"
         }
-    }
 
-    # Step 4: Configure .NET for TLS 1.2
-    Write-Host "Configuring .NET for TLS 1.2..." -ForegroundColor Yellow
-    
-    $tlsSettings = @(
-        @{Path = "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; Name = "SchUseStrongCrypto"; Value = 1},
-        @{Path = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319"; Name = "SchUseStrongCrypto"; Value = 1},
-        @{Path = "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; Name = "SystemDefaultTlsVersions"; Value = 1},
-        @{Path = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319"; Name = "SystemDefaultTlsVersions"; Value = 1}
-    )
+        # Step 4: Configure .NET for TLS 1.2
+        Write-Host "Configuring .NET for TLS 1.2..." -ForegroundColor Yellow
+        
+        $tlsSettings = @(
+            @{Path = "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; Name = "SchUseStrongCrypto"; Value = 1},
+            @{Path = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319"; Name = "SchUseStrongCrypto"; Value = 1},
+            @{Path = "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; Name = "SystemDefaultTlsVersions"; Value = 1},
+            @{Path = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319"; Name = "SystemDefaultTlsVersions"; Value = 1}
+        )
 
-    foreach ($setting in $tlsSettings) {
-        Ensure-RegistryKey -Path $setting.Path
-        Set-RegistryValue -Path $setting.Path -Name $setting.Name -Value $setting.Value -Type "DWord"
-    }
-
-    # Step 5: Configure NpsWrapperNET registry settings
-    Write-Host "Configuring NpsWrapperNET registry settings..." -ForegroundColor Yellow
-    
-    $npsWrapperPath = "HKLM:\SOFTWARE\NpsWrapperNET"
-    Ensure-RegistryKey -Path $npsWrapperPath
-
-    # Set all configuration values
-    $regSettings = @{
-        "AuthTimeout" = 60
-        "BasicAuthPassword" = $basicAuthPasswordPlain
-        "BasicAuthUserName" = $basicAuthUserName
-        "EnableTraceLogging" = 1
-        "IgnoreSslErrors" = 1
-        "MfaEnabledNPSPolicy" = $mfaEnabledPolicy
-        "NoMfaGroups" = "SMK\tsg-direct;SMK\TSG NO MFA"
-        "PollInterval" = 1
-        "PollMaxSeconds" = 90
-        "ServiceUrl" = $serviceUrl
-        "WaitBeforePoll" = 10
-    }
-
-    foreach ($setting in $regSettings.GetEnumerator()) {
-        if ($setting.Name -in @("AuthTimeout", "EnableTraceLogging", "IgnoreSslErrors", "PollInterval", "PollMaxSeconds", "WaitBeforePoll")) {
-            Set-RegistryValue -Path $npsWrapperPath -Name $setting.Name -Value $setting.Value -Type "DWord"
-        } else {
-            Set-RegistryValue -Path $npsWrapperPath -Name $setting.Name -Value $setting.Value -Type "String"
+        foreach ($setting in $tlsSettings) {
+            Ensure-RegistryKey -Path $setting.Path
+            Set-RegistryValue -Path $setting.Path -Name $setting.Name -Value $setting.Value -Type "DWord"
         }
+
+        # Step 5: Configure NpsWrapperNET registry settings
+        Write-Host "Configuring NpsWrapperNET registry settings..." -ForegroundColor Yellow
+        
+        $npsWrapperPath = "HKLM:\SOFTWARE\NpsWrapperNET"
+        Ensure-RegistryKey -Path $npsWrapperPath
+
+        # Set all configuration values
+        $regSettings = @{
+            "AuthTimeout" = 60
+            "BasicAuthPassword" = $basicAuthPasswordPlain
+            "BasicAuthUserName" = $basicAuthUserName
+            "EnableTraceLogging" = 1
+            "IgnoreSslErrors" = 1
+            "MfaEnabledNPSPolicy" = $mfaEnabledPolicy
+            "NoMfaGroups" = "SMK\tsg-direct;SMK\TSG NO MFA"
+            "PollInterval" = 1
+            "PollMaxSeconds" = 90
+            "ServiceUrl" = $serviceUrl
+            "WaitBeforePoll" = 10
+        }
+
+        foreach ($setting in $regSettings.GetEnumerator()) {
+            if ($setting.Name -in @("AuthTimeout", "EnableTraceLogging", "IgnoreSslErrors", "PollInterval", "PollMaxSeconds", "WaitBeforePoll")) {
+                Set-RegistryValue -Path $npsWrapperPath -Name $setting.Name -Value $setting.Value -Type "DWord"
+            } else {
+                Set-RegistryValue -Path $npsWrapperPath -Name $setting.Name -Value $setting.Value -Type "String"
+            }
+        }
+
+        # Step 6: Register NPS Extension DLLs (FIXED - proper cleanup and registration)
+        Write-Host "Registering NPS Extension DLLs..." -ForegroundColor Yellow
+        
+        $npsWrapperDllPath = "$destinationPath\NpsWrapper.dll"
+        if (!(Test-Path $npsWrapperDllPath)) {
+            throw "NpsWrapper.dll not found at $npsWrapperDllPath"
+        }
+
+        # Register Extension DLLs
+        $extensionDllsPath = "HKLM:\System\CurrentControlSet\Services\AuthSrv\Parameters"
+        Ensure-RegistryKey -Path $extensionDllsPath
+
+        # Use the new safe function to manage registry entries
+        Set-NpsDllRegistry -Path $extensionDllsPath -ValueName "ExtensionDLLs" -DllPath $npsWrapperDllPath
+        Set-NpsDllRegistry -Path $extensionDllsPath -ValueName "AuthorizationDLLs" -DllPath $npsWrapperDllPath
+    } else {
+        Write-Host "Update mode: Skipping Event Log sources, TLS configuration, registry settings, and NPS DLL registration." -ForegroundColor Cyan
     }
-
-    # Step 6: Register NPS Extension DLLs (FIXED - proper cleanup and registration)
-    Write-Host "Registering NPS Extension DLLs..." -ForegroundColor Yellow
-    
-    $npsWrapperDllPath = "$destinationPath\NpsWrapper.dll"
-    if (!(Test-Path $npsWrapperDllPath)) {
-        throw "NpsWrapper.dll not found at $npsWrapperDllPath"
-    }
-
-    # Register Extension DLLs
-    $extensionDllsPath = "HKLM:\System\CurrentControlSet\Services\AuthSrv\Parameters"
-    Ensure-RegistryKey -Path $extensionDllsPath
-
-    # Use the new safe function to manage registry entries
-    Set-NpsDllRegistry -Path $extensionDllsPath -ValueName "ExtensionDLLs" -DllPath $npsWrapperDllPath
-    Set-NpsDllRegistry -Path $extensionDllsPath -ValueName "AuthorizationDLLs" -DllPath $npsWrapperDllPath
 
     # Step 7: Start IAS service
     Write-Host "Starting IAS service..." -ForegroundColor Yellow
     Start-Service -Name "IAS" -ErrorAction Stop
     Write-Host "IAS service started successfully." -ForegroundColor Green
 
-    # Step 8: Verify service status
-    Write-Host "Verifying IAS service status..." -ForegroundColor Yellow
+    # Step 8: Restart RDG service if it was running before
+    if ($rdgWasRunning) {
+        Write-Host "Restarting Remote Desktop Gateway service..." -ForegroundColor Yellow
+        try {
+            Start-Service -Name "TSGateway" -ErrorAction Stop
+            Write-Host "Remote Desktop Gateway service started successfully." -ForegroundColor Green
+        } catch {
+            Write-Warning "Failed to start Remote Desktop Gateway service: $($_.Exception.Message)"
+            Write-Host "Please start the Remote Desktop Gateway service manually if needed." -ForegroundColor Yellow
+        }
+    }
+
+    # Step 9: Verify service status
+    Write-Host "Verifying service status..." -ForegroundColor Yellow
     $serviceStatus = Get-Service -Name "IAS"
     Write-Host "IAS Service Status: $($serviceStatus.Status)" -ForegroundColor $(if ($serviceStatus.Status -eq 'Running') { 'Green' } else { 'Red' })
+    
+    if ($rdgWasRunning) {
+        try {
+            $rdgStatus = Get-Service -Name "TSGateway"
+            Write-Host "RDG Service Status: $($rdgStatus.Status)" -ForegroundColor $(if ($rdgStatus.Status -eq 'Running') { 'Green' } else { 'Red' })
+        } catch {
+            Write-Host "RDG Service Status: Unable to check" -ForegroundColor Yellow
+        }
+    }
 
     Write-Host ""
     Write-Host "Deployment completed successfully!" -ForegroundColor Green
     Write-Host "=========================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Configuration Summary:" -ForegroundColor Yellow
-    Write-Host "  Build Type: $BuildType"
-    Write-Host "  Service URL: $serviceUrl"
-    Write-Host "  MFA Policy: $mfaEnabledPolicy"
-    Write-Host "  Username: $basicAuthUserName"
-    Write-Host "  Password: $("*" * 25)" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Next Steps:" -ForegroundColor Yellow
-    Write-Host "1. Test the NPS authentication with a client"
-    Write-Host "2. Check Windows Event Logs (Application) for any errors"
-    Write-Host "3. Verify MFA functionality with the configured policy"
-    Write-Host ""
-
+    
+    if (-not $Update) {
+        Write-Host "Configuration Summary:" -ForegroundColor Yellow
+        Write-Host "  Build Type: $BuildType"
+        Write-Host "  Service URL: $serviceUrl"
+        Write-Host "  MFA Policy: $mfaEnabledPolicy"
+        Write-Host "  Username: $basicAuthUserName"
+        Write-Host "  Password: $("*" * 25)" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Next Steps:" -ForegroundColor Yellow
+        Write-Host "1. Test the NPS authentication with a client"
+        Write-Host "2. Check Windows Event Logs (Application) for any errors"
+        Write-Host "3. Verify MFA functionality with the configured policy"
+        Write-Host ""
+    } else {
+        Write-Host "Update Summary:" -ForegroundColor Yellow
+        Write-Host "  Build Type: $BuildType"
+        Write-Host "  Files updated in: $destinationPath"
+        Write-Host ""
+        Write-Host "Note: Only files were updated. Registry settings and NPS registration were skipped." -ForegroundColor Cyan
+        Write-Host ""
+    }
 } catch {
     Write-Error "Deployment failed: $($_.Exception.Message)"
     Write-Host ""
-    Write-Host "Attempting to restart IAS service..." -ForegroundColor Yellow
+    Write-Host "Attempting to restart services..." -ForegroundColor Yellow
     try {
         Start-Service -Name "IAS" -ErrorAction SilentlyContinue
+        Write-Host "IAS service restart attempted." -ForegroundColor Cyan
+        
+        if ($rdgWasRunning) {
+            Start-Service -Name "TSGateway" -ErrorAction SilentlyContinue
+            Write-Host "Remote Desktop Gateway service restart attempted." -ForegroundColor Cyan
+        }
     } catch {
-        Write-Warning "Failed to restart IAS service. Please start it manually."
+        Write-Warning "Failed to restart services automatically. Please start them manually:"
+        Write-Warning "  - IAS (Network Policy Server)"
+        if ($rdgWasRunning) {
+            Write-Warning "  - TSGateway (Remote Desktop Gateway)"
+        }
     }
     exit 1
 } finally {
-    # Clear sensitive data from memory
-    if ($basicAuthPasswordPlain) {
-        $basicAuthPasswordPlain = $null
-    }
-    if ($basicAuthPassword) {
-        $basicAuthPassword.Dispose()
+    # Clear sensitive data from memory (only if collected)
+    if (-not $Update) {
+        if ($basicAuthPasswordPlain) {
+            $basicAuthPasswordPlain = $null
+        }
+        if ($basicAuthPassword) {
+            $basicAuthPassword.Dispose()
+        }
     }
 }
 

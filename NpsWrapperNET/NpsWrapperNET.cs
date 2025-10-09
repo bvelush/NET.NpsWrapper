@@ -51,7 +51,11 @@ namespace NpsWrapperNET {
         /// </summary>
         /// <returns>A return value other then 0 will cause NPS to fail to start</returns>
         public static uint RadiusExtensionInit() {
+            // Log component initialization with datetime and size
+            var moduleInfo = GetModuleInfo();
+            WriteEventLog(LogLevel.Information, $"Initializing NpsWrapperNET {moduleInfo}");
             WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
+            
             if (initCount == 0) {
                 initCount++;
                 _authenticator = new Authenticator();
@@ -314,6 +318,24 @@ namespace NpsWrapperNET {
                 EventInstance eventInstance = new EventInstance(0, 0, winLevel);
                 var body = string.Join(Environment.NewLine, subj_body);
                 EventLog.WriteEvent(eventLog.Source, eventInstance, new List<string>() { subj + Environment.NewLine + body }.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// Gets module information (datetime and size) for logging
+        /// </summary>
+        /// <returns>Formatted string with datetime and size</returns>
+        private static string GetModuleInfo() {
+            try {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                var location = assembly.Location;
+                if (System.IO.File.Exists(location)) {
+                    var fileInfo = new System.IO.FileInfo(location);
+                    return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
+                }
+                return "(info unavailable)";
+            } catch {
+                return "(info unavailable)";
             }
         }
     }

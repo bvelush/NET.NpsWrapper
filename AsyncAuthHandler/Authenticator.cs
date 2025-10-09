@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 
 namespace AsyncAuthHandler {
     public enum LogLevel {
@@ -44,6 +43,10 @@ namespace AsyncAuthHandler {
         private const string _basicAuthPasswordKey = "BasicAuthPassword";
 
         public Authenticator() {
+            // Log component initialization with datetime and size
+            var moduleInfo = GetModuleInfo();
+            WriteEventLog(LogLevel.Information, $"Initializing AsyncAuthHandler {moduleInfo}");
+            
             // Read settings from registry
             try {
                 using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
@@ -85,7 +88,25 @@ namespace AsyncAuthHandler {
                 WriteEventLog(LogLevel.Information, $"Basic authentication configured for user: {_basicAuthUsername}");
             }
 
-            WriteEventLog(LogLevel.Information, $"Authenticator initialized with service URL: {_serviceUrl}");
+            WriteEventLog(LogLevel.Information, $"AsyncAuthHandler initialized with service URL: {_serviceUrl}");
+        }
+
+        /// <summary>
+        /// Gets module information (datetime and size) for logging
+        /// </summary>
+        /// <returns>Formatted string with datetime and size</returns>
+        private string GetModuleInfo() {
+            try {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                var location = assembly.Location;
+                if (System.IO.File.Exists(location)) {
+                    var fileInfo = new System.IO.FileInfo(location);
+                    return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
+                }
+                return "(info unavailable)";
+            } catch {
+                return "(info unavailable)";
+            }
         }
 
         private int GetIntRegistryValue(RegistryKey key, string valueName, int defaultValue)
