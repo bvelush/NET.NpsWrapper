@@ -141,12 +141,23 @@ namespace NpsWrapperNET {
                     logRequest(control);
                     bool performMfa = true;
                     var policyName = AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
-                    // Either no MFA policy configured, no current policy is defined, or policies match - perform MFA
-                    if (string.IsNullOrEmpty(_mfaEnabledNpsPolicy) || 
-                        string.IsNullOrEmpty(policyName) || 
-                        string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
+                    
+                    // Check if we should perform MFA based on policy configuration
+                    if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy)) {
+                        // MFA policy is configured - only perform MFA if current policy matches
+                        if (string.IsNullOrEmpty(policyName) || 
+                            !string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
+                            performMfa = false;
+                            WriteEventLog(LogLevel.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
+                        } else {
+                            WriteEventLog(LogLevel.Trace, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
+                        }
+                    } else {
+                        // No MFA policy configured - always perform MFA (secure default)
+                        WriteEventLog(LogLevel.Trace, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
+                    }
 
-                        WriteEventLog(LogLevel.Trace, $"MFA will be performed: MfaPolicy='{_mfaEnabledNpsPolicy}', CurrentPolicy='{policyName}'");
+                    if (performMfa) {
                         try {
                             userName = AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
                             // Check if user is in NoMFA group by SID
@@ -180,10 +191,6 @@ namespace NpsWrapperNET {
                         catch (Exception ex) {
                             WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
-                    } else {
-                        // Policies don't match - skip MFA
-                        performMfa = false;
-                        WriteEventLog(LogLevel.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy: '{_mfaEnabledNpsPolicy}', skipping MFA.");
                     }
                     
                     if (performMfa) {
