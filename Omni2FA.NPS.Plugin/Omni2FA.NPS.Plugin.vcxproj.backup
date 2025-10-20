@@ -120,7 +120,7 @@
       <AdditionalUsingDirectories>%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies >Advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies />
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
@@ -165,5 +165,4 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
-
 
