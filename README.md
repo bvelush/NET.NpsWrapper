@@ -36,13 +36,6 @@ Windows Registry Editor Version 5.00
 
 run deploy.cmd
 
-# Omni2FA
-
-Omni2FA aims to enrich Microsoft Network Policy Server (NPS)
-through a set of custom DLLs fitting some use cases you might have.
-Thanks to `OpenCymd.Nps` project provides a .NET wrapper around
-NPS API for easier customization.
-
 # Contents
 
 ## Omni2FA.NPS.Plugin

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <!-- Configuration for .NET Tests -->
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Exclude>[*.Tests]*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+
+  <!-- Configuration for Google Test (C++) -->
+  <GoogleTestAdapterSettings>
+    <SolutionSettings>
+      <!-- Settings for Test Adapter for Google Test -->
+      <Settings>
+        <!-- Print test output -->
+        <PrintTestOutput>true</PrintTestOutput>
+        
+        <!-- Run tests in parallel -->
+        <ParallelTestExecution>
+          <MaxNrOfThreads>4</MaxNrOfThreads>
+        </ParallelTestExecution>
+        
+        <!-- Test discovery settings -->
+        <TestDiscoveryRegex>.*Tests\.exe</TestDiscoveryRegex>
+        
+        <!-- Additional test execution parameters -->
+        <AdditionalTestExecutionParams>--gtest_color=yes</AdditionalTestExecutionParams>
+        
+        <!-- Working directory -->
+        <WorkingDir>$(ExecutableDir)</WorkingDir>
+        
+        <!-- Batch for test execution -->
+        <BatchForTestSetup></BatchForTestSetup>
+        <BatchForTestTeardown></BatchForTestTeardown>
+      </Settings>
+    </SolutionSettings>
+  </GoogleTestAdapterSettings>
+
+  <!-- General test run parameters -->
+  <RunConfiguration>
+    <!-- Results directory -->
+    <ResultsDirectory>.\TestResults</ResultsDirectory>
+    
+    <!-- Maximum CPU cores to use -->
+    <MaxCpuCount>0</MaxCpuCount>
+    
+    <!-- Test timeout in milliseconds (10 minutes) -->
+    <TestSessionTimeout>600000</TestSessionTimeout>
+    
+    <!-- Target platform for tests -->
+    <TargetPlatform>x64</TargetPlatform>
+  </RunConfiguration>
+
+  <!-- MSTest configuration -->
+  <MSTest>
+    <Parallelize>
+      <Workers>4</Workers>
+      <Scope>ClassLevel</Scope>
+    </Parallelize>
+  </MSTest>
+</RunSettings>
