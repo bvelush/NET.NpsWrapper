@@ -42,7 +42,8 @@ try {
         /p:CoverletOutputFormat=cobertura `
         /p:CoverletOutput="$authClientCoverageFile" `
         /p:ExcludeByFile="**/*AssemblyInfo.cs%2c**/*.g.cs" `
-        /p:Exclude="[*.Tests]*"
+        /p:Exclude="[*.Tests]*%2c[AsyncAuthHandler]*%2c[Omni2FA.Auth]*" `
+        /p:Include="[Omni2FA.AuthClient]*%2c[Omni2FA.Adapter]*"
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: Some tests failed, but coverage was collected." -ForegroundColor Yellow
@@ -77,7 +78,8 @@ try {
         "-targetdir:$reportDir" `
         "-reporttypes:Html;HtmlSummary;Badges;TextSummary" `
         "-title:Omni2FA Code Coverage Report" `
-        "-verbosity:Info"
+        "-verbosity:Info" `
+        "-assemblyfilters:-AsyncAuthHandler;-Omni2FA.Auth"
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error generating report!" -ForegroundColor Red
@@ -118,4 +120,5 @@ if ($OpenReport -and (Test-Path $indexFile)) {
 }
 
 Write-Host ""
+Write-Host "Note: Old assemblies (AsyncAuthHandler, Omni2FA.Auth) are excluded from coverage." -ForegroundColor Yellow
 Write-Host "Done! ?" -ForegroundColor Green
