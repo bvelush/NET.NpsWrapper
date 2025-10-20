@@ -7,8 +7,8 @@
     <ProjectGuid>{76AF0A05-C47C-4F32-8008-4D09689F5892}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AsyncAuthHandler</RootNamespace>
-    <AssemblyName>AsyncAuthHandler</AssemblyName>
+    <RootNamespace>Omni2FA.AuthClient</RootNamespace>
+    <AssemblyName>Omni2FA.AuthClient</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

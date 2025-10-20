@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -7,8 +7,8 @@
     <ProjectGuid>{9594C3BC-6D4A-489C-86AC-3EB2EB019057}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>NpsWrapperNET</RootNamespace>
-    <AssemblyName>NpsWrapperNET</AssemblyName>
+    <RootNamespace>Omni2FA.Adapter</RootNamespace>
+    <AssemblyName>Omni2FA.Adapter</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -43,7 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="NpsWrapperNET.cs" />
+    <Compile Include="Omni2FA.Adapter.cs" />
     <Compile Include="OpenCymd\ExtensionControl.cs" />
     <Compile Include="OpenCymd\IExtensionControl.cs" />
     <Compile Include="OpenCymd\Native\RADIUS_ACTION.cs" />
@@ -76,9 +76,9 @@
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AsyncAuthHandler\AsyncAuthHandler.csproj">
+    <ProjectReference Include="..\Omni2FA.AuthClient\Omni2FA.AuthClient.csproj">
       <Project>{76af0a05-c47c-4f32-8008-4d09689f5892}</Project>
-      <Name>AsyncAuthHandler</Name>
+      <Name>Omni2FA.AuthClient</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

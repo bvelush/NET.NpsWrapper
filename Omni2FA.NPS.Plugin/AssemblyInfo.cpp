@@ -6,11 +6,11 @@ using namespace System::Runtime::CompilerServices;
 using namespace System::Runtime::InteropServices;
 using namespace System::Security::Permissions;
 
-[assembly:AssemblyTitleAttribute(L"NpsWrapper")];
+[assembly:AssemblyTitleAttribute(L"Omni2FA.NPS.Plugin")];
 [assembly:AssemblyDescriptionAttribute(L"")];
 [assembly:AssemblyConfigurationAttribute(L"")];
 [assembly:AssemblyCompanyAttribute(L"")];
-[assembly:AssemblyProductAttribute(L"NpsWrapper")];
+[assembly:AssemblyProductAttribute(L"Omni2FA.NPS.Plugin")];
 [assembly:AssemblyCopyrightAttribute(L"https://github.com/lestoilfante 2023")];
 [assembly:AssemblyTrademarkAttribute(L"")];
 [assembly:AssemblyCultureAttribute(L"")];

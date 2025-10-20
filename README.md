@@ -1,8 +1,8 @@
 # Creating Source in Windows Applications log
 ```PowerShell
-New-EventLog -LogName Application -Source "NPS-Wrapper"
-New-EventLog -LogName Application -Source "NPS-Wrapper.NET"
-New-EventLog -LogName Application -Source "NPS-AsyncAuthHandler"
+New-EventLog -LogName Application -Source "Omni2FA.NPS.Plugin"
+New-EventLog -LogName Application -Source "Omni2FA.Adapter"
+New-EventLog -LogName Application -Source "Omni2FA.AuthClient"
 ```
 
 Modifying .NET for TLS v1.2:
@@ -18,7 +18,7 @@ Registry settings:
 ```reg
 Windows Registry Editor Version 5.00
 
-[HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
+[HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS.PluginNET]
 "AuthTimeout"=dword:0000003c
 "BasicAuthPassword"="<password>"
 "BasicAuthUserName"="<username>"
@@ -36,20 +36,20 @@ Windows Registry Editor Version 5.00
 
 run deploy.cmd
 
-# NET.NpsWrapper
+# Omni2FA
 
-NET.NpsWrapper aims to enrich Microsoft Network Policy Server (NPS)
+Omni2FA aims to enrich Microsoft Network Policy Server (NPS)
 through a set of custom DLLs fitting some use cases you might have.
 Thanks to `OpenCymd.Nps` project provides a .NET wrapper around
 NPS API for easier customization.
 
 # Contents
 
-## NpsWrapper
+## Omni2FA.NPS.Plugin
 
-NPS Extension DLL exporting callback functions and bridge to .NET NpsWrapperNET dll.
+NPS Extension DLL exporting callback functions and bridge to .NET Omni2FA.NPS.PluginNET dll.
 
-## NpsWrapperNET
+## Omni2FA.NPS.PluginNET
 
 .NET implementation of NPS Extension API functions.
 
@@ -65,7 +65,7 @@ need to be created or complemented:
  * `HKLM\System\CurrentControlSet\Services\AuthSrv\Parameters\ExtensionDLLs`
  * `HKLM\System\CurrentControlSet\Services\AuthSrv\Parameters\AuthorizationDLLs`
 
-Both values need to contain appropriate full path to `NpsWrapper.dll`.
+Both values need to contain appropriate full path to `Omni2FA.NPS.Plugin.dll`.
 
 # Compatibility
 

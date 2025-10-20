@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
@@ -8,7 +8,7 @@ using Microsoft.Win32;
 using Newtonsoft.Json;
 using System.Net;
 
-namespace AsyncAuthHandler {
+namespace Omni2FA.AuthClient {
     public enum LogLevel {
         Trace, 
         Information,
@@ -18,7 +18,7 @@ namespace AsyncAuthHandler {
 
     public class Authenticator {
 
-        const string APP_NAME = "NPS-AsyncAuthHandler";
+        const string APP_NAME = "Omni2FA.AuthClient";
         private readonly HttpClient _httpClient;
 
         private int _authTimeout = 60; // seconds
@@ -31,7 +31,7 @@ namespace AsyncAuthHandler {
         private string _basicAuthUsername = "";
         private string _basicAuthPassword = "";
 
-        private const string _regPath = @"SOFTWARE\NpsWrapperNET";
+        private const string _regPath = @"SOFTWARE\Omni2FA.NPS.PluginNET";
         private const string _authTimeoutKey = "AuthTimeout";
         private const string _serviceUrlKey = "ServiceUrl";
         private const string _waitBeforePollKey = "WaitBeforePoll";
@@ -45,7 +45,7 @@ namespace AsyncAuthHandler {
         public Authenticator() {
             // Log component initialization with datetime and size
             var moduleInfo = GetModuleInfo();
-            WriteEventLog(LogLevel.Information, $"Initializing AsyncAuthHandler {moduleInfo}");
+            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.Auth {moduleInfo}");
             
             // Read settings from registry
             try {
@@ -88,7 +88,7 @@ namespace AsyncAuthHandler {
                 WriteEventLog(LogLevel.Information, $"Basic authentication configured for user: {_basicAuthUsername}");
             }
 
-            WriteEventLog(LogLevel.Information, $"AsyncAuthHandler initialized with service URL: {_serviceUrl}");
+            WriteEventLog(LogLevel.Information, $"Omni2FA.Auth initialized with service URL: {_serviceUrl}");
         }
 
         /// <summary>

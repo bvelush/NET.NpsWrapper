@@ -3,9 +3,9 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using AsyncAuthHandler;
+using Omni2FA.AuthClient;
 
-namespace AsyncAuthHandler.Tests
+namespace Omni2FA.AuthClient.Tests
 {
     [TestClass]
     public class AuthenticatorIntegrationTests

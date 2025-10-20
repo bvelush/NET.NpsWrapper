@@ -31,7 +31,7 @@ static bool g_initialized = false;
 static bool g_enableTraceLogging = false;
 
 // Registry path and key
-static const wchar_t* REG_PATH = L"SOFTWARE\\NpsWrapperNET";
+static const wchar_t* REG_PATH = L"SOFTWARE\\Omni2FA.NPS.PluginNET";
 static const wchar_t* ENABLE_TRACE_KEY = L"EnableTraceLogging";
 
 // Log name and source constants
@@ -39,7 +39,7 @@ public ref class LogConstants abstract sealed
 {
 public:
     literal System::String^ LOG_NAME = "Application";
-    literal System::String^ LOG_SOURCE = "NPS-Wrapper";
+    literal System::String^ LOG_SOURCE = "Omni2FA.NPS.Plugin";
 };
 
 // Map LogLevel to EventLogEntryType
@@ -144,10 +144,10 @@ void Initialize()
     try
     {
         ReadTraceLoggingSetting();
-        LogEvent(LogLevel::Information, String::Format("Initializing NpsWrapper {0}", GetModuleInfo()));
+        LogEvent(LogLevel::Information, String::Format("Initializing Omni2FA.NPS.Plugin {0}", GetModuleInfo()));
         AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = true;
-        LogEvent(LogLevel::Information, "NpsWrapper initialized.");
+        LogEvent(LogLevel::Information, "Omni2FA.NPS.Plugin initialized.");
     }
     catch (Exception^ ex)
     {
@@ -159,10 +159,10 @@ void Cleanup()
 {
     try
     {
-        LogEvent(LogLevel::Information, "Cleaning up NpsWrapper...");
+        LogEvent(LogLevel::Information, "Cleaning up Omni2FA.NPS.Plugin...");
         AppDomain::CurrentDomain->AssemblyResolve -= gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = false;
-        LogEvent(LogLevel::Information, "NpsWrapper cleaned up.");
+        LogEvent(LogLevel::Information, "Omni2FA.NPS.Plugin cleaned up.");
     }
     catch (Exception^ ex)
     {
@@ -177,7 +177,7 @@ DWORD WINAPI RadiusExtensionInit(VOID)
     {
         if (!g_initialized)
             Initialize();
-        DWORD result = NpsWrapperNET::NpsWrapper::RadiusExtensionInit();
+        DWORD result = Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionInit();
         LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionInit completed with result: ", result.ToString()));
         return result;
     }
@@ -195,7 +195,7 @@ VOID WINAPI RadiusExtensionTerm(VOID)
     {
         if (g_initialized)
             Cleanup();
-        NpsWrapperNET::NpsWrapper::RadiusExtensionTerm();
+        Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionTerm();
         LogEvent(LogLevel::Trace, "RadiusExtensionTerm completed.");
     }
     catch (Exception^ ex)
@@ -211,7 +211,7 @@ DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
     {
         if (!g_initialized)
             Initialize();
-        DWORD result = NpsWrapperNET::NpsWrapper::RadiusExtensionProcess2(IntPtr(pECB));
+        DWORD result = Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionProcess2(IntPtr(pECB));
         LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
         return result;
     }

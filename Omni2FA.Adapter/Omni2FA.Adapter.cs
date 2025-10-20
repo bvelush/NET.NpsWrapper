@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // <copyright>
 //   Copyright lestoilfante 2023 (https://github.com/lestoilfante)
 //   
@@ -11,11 +11,11 @@ using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
-using AsyncAuthHandler;
+using Omni2FA.AuthClient;
 using System.DirectoryServices.AccountManagement;
 using Microsoft.Win32;
 
-namespace NpsWrapperNET {
+namespace Omni2FA.NPS.Adapter {
     public enum LogLevel {
         Trace,
         Information,
@@ -26,8 +26,8 @@ namespace NpsWrapperNET {
     /// <summary>
     /// Provides the entry points for the NPS service (indirectly called by the C++/CLR wrapper).
     /// </summary>
-    public class NpsWrapper {
-        const string APP_NAME = "NPS-Wrapper.NET";
+    public class NpsAdapter {
+        const string APP_NAME = "Omni2FA.Adapter";
 
         private static int initCount = 0;
         // Add a static field for the authenticator
@@ -38,9 +38,9 @@ namespace NpsWrapperNET {
         // Store MFA-enabled NPS policy name
         private static string _mfaEnabledNpsPolicy = string.Empty;
         // Registry path and value name for NoMFA groups
-        // [HKEY_LOCAL_MACHINE\SOFTWARE\NpsWrapperNET]
+        // [HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS.PluginNET]
         // "NoMfaGroups"="Group1;Group2;Group3"
-        private const string _regPath = @"SOFTWARE\\NpsWrapperNET";
+        private const string _regPath = @"SOFTWARE\\Omni2FA.NPS.PluginNET";
         private const string _noMfaKey = "NoMfaGroups";
         private const string _enableTraceLoggingKey = "EnableTraceLogging";
         private const string _mfaEnabledNpsPolicyKey = "MfaEnabledNPSPolicy";
@@ -53,7 +53,7 @@ namespace NpsWrapperNET {
         public static uint RadiusExtensionInit() {
             // Log component initialization with datetime and size
             var moduleInfo = GetModuleInfo();
-            WriteEventLog(LogLevel.Information, $"Initializing NpsWrapperNET {moduleInfo}");
+            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.NPS.PluginNET {moduleInfo}");
             WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
             
             if (initCount == 0) {
@@ -340,3 +340,4 @@ namespace NpsWrapperNET {
         }
     }
 }
+

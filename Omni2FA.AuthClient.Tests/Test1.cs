@@ -1,8 +1,8 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using AsyncAuthHandler;
+using Omni2FA.AuthClient;
 
-namespace AsyncAuthHandler.Tests;
+namespace Omni2FA.AuthClient.Tests;
 
 [TestClass]
 public sealed class Test1

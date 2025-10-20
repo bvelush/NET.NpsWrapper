@@ -23,9 +23,9 @@
     <ProjectGuid>{5B30C070-A04F-4289-83DD-2C06E2534FEC}</ProjectGuid>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <Keyword>ManagedCProj</Keyword>
-    <RootNamespace>NpsWrapper</RootNamespace>
+    <RootNamespace>Omni2FA.NPS.Plugin</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>NpsWrapper</ProjectName>
+    <ProjectName>Omni2FA.NPS.Plugin</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -133,7 +133,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AssemblyInfo.cpp" />
-    <ClCompile Include="NpsWrapper.cpp" />
+    <ClCompile Include="Omni2FA.NPS.Plugin.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -157,7 +157,7 @@
     <None Include="exports.def" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\NpsWrapperNET\NpsWrapperNET.csproj">
+    <ProjectReference Include="..\Omni2FA.Adapter\Omni2FA.Adapter.csproj">
       <Project>{9594c3bc-6d4a-489c-86ac-3eb2eb019057}</Project>
     </ProjectReference>
   </ItemGroup>
