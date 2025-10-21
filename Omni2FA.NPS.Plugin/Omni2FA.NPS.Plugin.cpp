@@ -31,7 +31,7 @@ static bool g_initialized = false;
 static bool g_enableTraceLogging = false;
 
 // Registry path and key
-static const wchar_t* REG_PATH = L"SOFTWARE\\Omni2FA.NPS.PluginNET";
+static const wchar_t* REG_PATH = L"SOFTWARE\\Omni2FA.NPS";
 static const wchar_t* ENABLE_TRACE_KEY = L"EnableTraceLogging";
 
 // Log name and source constants

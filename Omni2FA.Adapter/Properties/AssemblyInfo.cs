@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Omni2FA.NPS.PluginNET")]
+[assembly: AssemblyTitle("Omni2FA.Adapter")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("Omni2FA.NPS.PluginNET")]
+[assembly: AssemblyProduct("Omni2FA.Adapter")]
 [assembly: AssemblyCopyright("https://github.com/lestoilfante 2023")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

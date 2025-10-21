@@ -38,9 +38,9 @@ namespace Omni2FA.NPS.Adapter {
         // Store MFA-enabled NPS policy name
         private static string _mfaEnabledNpsPolicy = string.Empty;
         // Registry path and value name for NoMFA groups
-        // [HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS.PluginNET]
+        // [HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS]
         // "NoMfaGroups"="Group1;Group2;Group3"
-        private const string _regPath = @"SOFTWARE\\Omni2FA.NPS.PluginNET";
+        private const string _regPath = @"SOFTWARE\\Omni2FA.NPS";
         private const string _noMfaKey = "NoMfaGroups";
         private const string _enableTraceLoggingKey = "EnableTraceLogging";
         private const string _mfaEnabledNpsPolicyKey = "MfaEnabledNPSPolicy";
@@ -53,7 +53,7 @@ namespace Omni2FA.NPS.Adapter {
         public static uint RadiusExtensionInit() {
             // Log component initialization with datetime and size
             var moduleInfo = GetModuleInfo();
-            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.NPS.PluginNET {moduleInfo}");
+            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
             WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
             
             if (initCount == 0) {

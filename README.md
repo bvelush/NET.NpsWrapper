@@ -18,7 +18,7 @@ Registry settings:
 ```reg
 Windows Registry Editor Version 5.00
 
-[HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS.PluginNET]
+[HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS]
 "AuthTimeout"=dword:0000003c
 "BasicAuthPassword"="<password>"
 "BasicAuthUserName"="<username>"
@@ -36,19 +36,6 @@ Windows Registry Editor Version 5.00
 
 run deploy.cmd
 
-# Contents
-
-## Omni2FA.NPS.Plugin
-
-NPS Extension DLL exporting callback functions and bridge to .NET Omni2FA.NPS.PluginNET dll.
-
-## Omni2FA.NPS.PluginNET
-
-.NET implementation of NPS Extension API functions.
-
-## Auth_WatchGuard
-
-Adds MFA support to NPS based on WatchGuard AuthPoint.
 
 # Installation
 

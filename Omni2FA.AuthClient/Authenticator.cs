@@ -31,7 +31,7 @@ namespace Omni2FA.AuthClient {
         private string _basicAuthUsername = "";
         private string _basicAuthPassword = "";
 
-        private const string _regPath = @"SOFTWARE\Omni2FA.NPS.PluginNET";
+        private const string _regPath = @"SOFTWARE\Omni2FA.NPS";
         private const string _authTimeoutKey = "AuthTimeout";
         private const string _serviceUrlKey = "ServiceUrl";
         private const string _waitBeforePollKey = "WaitBeforePoll";
