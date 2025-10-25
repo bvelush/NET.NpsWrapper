@@ -16,12 +16,6 @@ using Microsoft.Win32;
 using Omni2FA.NPS.Adapter.Utils;
 
 namespace Omni2FA.NPS.Adapter {
-    public enum LogLevel {
-        Trace,
-        Information,
-        Warning,
-        Error
-    }
 
     /// <summary>
     /// Provides the entry points for the NPS service (indirectly called by the C++/CLR wrapper).
@@ -53,8 +47,8 @@ namespace Omni2FA.NPS.Adapter {
         public static uint RadiusExtensionInit() {
             // Log component initialization with datetime and size
             var moduleInfo = GetModuleInfo();
-            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
-            WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
+            Log.Event(Log.Level.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
+            Log.Event(Log.Level.Trace, "RadiusExtensionInit called");
 
             if (initCount == 0) {
                 initCount++;
@@ -62,7 +56,7 @@ namespace Omni2FA.NPS.Adapter {
 
                 // Initialize the Groups helper
                 Groups.Initialize();
-                WriteEventLog(LogLevel.Trace, $"Hostname detected: {Groups.Hostname}");
+                Log.Event(Log.Level.Trace, $"Hostname detected: {Groups.Hostname}");
 
                 try {
                     using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
@@ -77,10 +71,10 @@ namespace Omni2FA.NPS.Adapter {
                             var mfaPolicyValue = key.GetValue(_mfaEnabledNpsPolicyKey) as string;
                             if (!string.IsNullOrEmpty(mfaPolicyValue)) {
                                 _mfaEnabledNpsPolicy = mfaPolicyValue.Trim();
-                                WriteEventLog(LogLevel.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
+                                Log.Event(Log.Level.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
                             }
                             else {
-                                WriteEventLog(LogLevel.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
+                                Log.Event(Log.Level.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
                             }
 
                             // Read NoMFA group names and resolve to SIDs
@@ -92,27 +86,27 @@ namespace Omni2FA.NPS.Adapter {
 
                                     if (result != null && result.Success) {
                                         _noMfaGroupSids.Add(result.Sid);
-                                        WriteEventLog(LogLevel.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
+                                        Log.Event(Log.Level.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
                                     }
                                     else if (result != null && !string.IsNullOrEmpty(result.Error)) {
-                                        WriteEventLog(LogLevel.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
+                                        Log.Event(Log.Level.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
                                     }
                                     else {
-                                        WriteEventLog(LogLevel.Warning, $"NoMFA group not found: {trimmedName}");
+                                        Log.Event(Log.Level.Warning, $"NoMFA group not found: {trimmedName}");
                                     }
                                 }
                             }
                             else {
-                                WriteEventLog(LogLevel.Warning, "NoMfaGroups registry value is empty or missing.");
+                                Log.Event(Log.Level.Warning, "NoMfaGroups registry value is empty or missing.");
                             }
                         }
                         else {
-                            WriteEventLog(LogLevel.Warning, $"Registry key not found: {_regPath}");
+                            Log.Event(Log.Level.Warning, $"Registry key not found: {_regPath}");
                         }
                     }
                 }
                 catch (Exception ex) {
-                    WriteEventLog(LogLevel.Warning, $"Error reading registry during initialization: {ex.Message}");
+                    Log.Event(Log.Level.Warning, $"Error reading registry during initialization: {ex.Message}");
                 }
             }
             return 0;
@@ -125,7 +119,7 @@ namespace Omni2FA.NPS.Adapter {
         public static void RadiusExtensionTerm() {
             initCount--;
             if (initCount == 0) {
-                WriteEventLog(LogLevel.Trace, "RadiusExtensionTerm called");
+                Log.Event(Log.Level.Trace, "RadiusExtensionTerm called");
             }
         }
         /// <summary>
@@ -159,15 +153,15 @@ namespace Omni2FA.NPS.Adapter {
                         if (string.IsNullOrEmpty(policyName) ||
                             !string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
                             performMfa = false;
-                            WriteEventLog(LogLevel.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
+                            Log.Event(Log.Level.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
                         }
                         else {
-                            WriteEventLog(LogLevel.Trace, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
+                            Log.Event(Log.Level.Trace, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
                         }
                     }
                     else {
                         // No MFA policy configured - always perform MFA (secure default)
-                        WriteEventLog(LogLevel.Trace, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
+                        Log.Event(Log.Level.Trace, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
                     }
 
                     if (performMfa) {
@@ -182,15 +176,15 @@ namespace Omni2FA.NPS.Adapter {
                                 var matchingSids = userResult.GroupSids.Intersect(_noMfaGroupSids).ToList();
                                 if (matchingSids.Any()) {
                                     performMfa = false;
-                                    WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group (matched {matchingSids.Count} SID(s)), skipping MFA.");
+                                    Log.Event(Log.Level.Information, $"User {userName} is in NoMFA group (matched {matchingSids.Count} SID(s)), skipping MFA.");
                                 }
                             }
                             else if (userResult != null && !string.IsNullOrEmpty(userResult.Error)) {
-                                WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {userResult.Error}");
+                                Log.Event(Log.Level.Warning, $"Error checking NoMFA group membership for user '{userName}': {userResult.Error}");
                             }
                         }
                         catch (Exception ex) {
-                            WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
+                            Log.Event(Log.Level.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
                     }
 
@@ -199,17 +193,17 @@ namespace Omni2FA.NPS.Adapter {
                         if (resMfa) {
                             /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
                             control.ResponseType = RadiusCode.AccessAccept;
-                            WriteEventLog(LogLevel.Information, $"MFA succeeded for user {userName}");
+                            Log.Event(Log.Level.Information, $"MFA succeeded for user {userName}");
                         }
                         else {
                             /* Set final disposition to AccessReject - Note that could be changed by other extensions */
                             control.ResponseType = RadiusCode.AccessReject;
-                            WriteEventLog(LogLevel.Warning, $"MFA failed for user {userName}");
+                            Log.Event(Log.Level.Warning, $"MFA failed for user {userName}");
                         }
                     }
                     else {
                         control.ResponseType = RadiusCode.AccessAccept;
-                        WriteEventLog(LogLevel.Information, $"MFA skipped for user {userName}, accepting request.");
+                        Log.Event(Log.Level.Information, $"MFA skipped for user {userName}, accepting request.");
                     }
                 }
             }
@@ -232,7 +226,7 @@ namespace Omni2FA.NPS.Adapter {
                         "-ResponseType: " + control.ResponseType.ToString()
                     };
 
-            WriteEventLog(LogLevel.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
+            Log.Event(Log.Level.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
 
             var userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
             if (!string.IsNullOrEmpty(userName)) {
@@ -242,20 +236,20 @@ namespace Omni2FA.NPS.Adapter {
                 logMessage.Add($"-Connection Request Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName)}'");
                 logMessage.Add($"-Network Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.PolicyName)}'");
             }
-            WriteEventLog(LogLevel.Trace, "Authorization request", logMessage);
+            Log.Event(Log.Level.Trace, "Authorization request", logMessage);
 
             string s = "";
             foreach (var attr in AttributesToList(control.Request)) {
                 s += " | " + sanitizeString(attr);
             }
-            WriteEventLog(LogLevel.Trace, $"Request components: {s}");
+            Log.Event(Log.Level.Trace, $"Request components: {s}");
 
 
             s = "";
             foreach (var attr in AttributesToList(control.Response[RadiusCode.AccessAccept])) {
                 s += " ~ " + sanitizeString(attr);
             }
-            WriteEventLog(LogLevel.Trace, $"Response components: {s}");
+            Log.Event(Log.Level.Trace, $"Response components: {s}");
         }
 
         private static string AttributeLookup(IList<RadiusAttribute> attributesList, RadiusAttributeType attributeType) {
@@ -277,47 +271,7 @@ namespace Omni2FA.NPS.Adapter {
             }
             return r;
         }
-        /// <summary>
-        /// Writes Windows Event Log (Application)
-        /// </summary>
-        /// <param name="src">Event Source Name</param>
-        /// <param name="subj">Event first row</param>
-        /// <param name="subj_body">Event additional rows to append</param>
-        /// <param name="level">Event Level</param>
-        private static void WriteEventLog(LogLevel level, string subj, List<string> subj_body = null) {
-            EventLogEntryType winLevel;
-            switch (level) {
-                case LogLevel.Trace:
-                    if (!_enableTraceLogging) {
-                        return;
-                    }
-                    subj = "[TRACE] " + subj;
-                    winLevel = EventLogEntryType.Information;
-                    break;
-                case LogLevel.Information:
-                    winLevel = EventLogEntryType.Information;
-                    break;
-                case LogLevel.Warning:
-                    winLevel = EventLogEntryType.Warning;
-                    break;
-                case LogLevel.Error:
-                    winLevel = EventLogEntryType.Error;
-                    break;
-                default:
-                    winLevel = EventLogEntryType.Information;
-                    break;
-            }
-
-            if (subj_body == null) {
-                subj_body = new List<string>();
-            }
-            using (EventLog eventLog = new EventLog("Application")) {
-                eventLog.Source = APP_NAME;
-                EventInstance eventInstance = new EventInstance(0, 0, winLevel);
-                var body = string.Join(Environment.NewLine, subj_body);
-                EventLog.WriteEvent(eventLog.Source, eventInstance, new List<string>() { subj + Environment.NewLine + body }.ToArray());
-            }
-        }
+        
 
         /// <summary>
         /// Gets module information (datetime and size) for logging
