@@ -25,7 +25,7 @@ namespace OpenCymd.Nps.Plugin
     /// <summary>
     /// Managed implementation of <see cref="RADIUS_EXTENSION_CONTROL_BLOCK"/>.
     /// </summary>
-    internal class ExtensionControl : IExtensionControl
+    public class ExtensionControl : IExtensionControl
     {
         private readonly IntPtr ecbPtr;
 
@@ -39,7 +39,7 @@ namespace OpenCymd.Nps.Plugin
         /// Initializes a new instance of the <see cref="ExtensionControl"/> class.
         /// </summary>
         /// <param name="ecbPtr">Pointer to the RADIUS_EXTENSION_CONTROL_BLOCK.</param>
-        internal ExtensionControl(IntPtr ecbPtr)
+        public ExtensionControl(IntPtr ecbPtr)
         {
             this.ecbPtr = ecbPtr;
             this.ecb = (RADIUS_EXTENSION_CONTROL_BLOCK)Marshal.PtrToStructure(this.ecbPtr, typeof(RADIUS_EXTENSION_CONTROL_BLOCK));

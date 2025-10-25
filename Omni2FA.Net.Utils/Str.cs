@@ -1,6 +1,6 @@
 ﻿
 
-namespace Omni2FA.Adapter.Utils {
+namespace Omni2FA.Net.Utils {
     internal class Str {
         public static string sanitize(string input) {
             // for some reason, stirng.Trim() does not remove trailing \0 char

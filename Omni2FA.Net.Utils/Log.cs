@@ -10,11 +10,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Omni2FA.Adapter.Utils {
+namespace Omni2FA.Net.Utils {
     /// <summary>
     /// Helper class for writing to Windows Event 
     /// </summary>
-    internal static class Log {
+    public static class Log {
         private const string APP_NAME = "Omni2FA.Adapter";
         private static bool _enableTraceLogging = false;
 

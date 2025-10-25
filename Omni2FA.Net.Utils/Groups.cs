@@ -9,11 +9,11 @@ using System;
 using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
 
-namespace Omni2FA.Adapter.Utils {
+namespace Omni2FA.Net.Utils {
     /// <summary>
     /// Helper class for resolving users and groups in both local and domain contexts.
     /// </summary>
-    internal static class Groups {
+    public static class Groups {
         private static string _hostname = string.Empty;
 
         /// <summary>
@@ -145,7 +145,7 @@ namespace Omni2FA.Adapter.Utils {
     /// <summary>
     /// Result of a group resolution operation.
     /// </summary>
-    internal class GroupResolutionResult {
+    public class GroupResolutionResult {
         public string GroupName { get; set; }
         public string Sid { get; set; }
         public bool IsLocal { get; set; }
@@ -159,7 +159,7 @@ namespace Omni2FA.Adapter.Utils {
     /// <summary>
     /// Result of a user resolution operation.
     /// </summary>
-    internal class UserResolutionResult {
+    public class UserResolutionResult {
         public string UserName { get; set; }
         public bool IsLocal { get; set; }
         public ContextType ContextType { get; set; }

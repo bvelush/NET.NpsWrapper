@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Omni2FA.Adapter.Utils {
-    internal static class Radius {
+namespace Omni2FA.Net.Utils {
+    public static class Radius {
         public static string AttributeLookup(IList<RadiusAttribute> attributesList, RadiusAttributeType attributeType) {
             var a = attributesList.FirstOrDefault(x => x.AttributeId.Equals((int)attributeType));
             if (a == null)

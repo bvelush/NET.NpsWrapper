@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Omni2FA.AuthClient;
 using Microsoft.Win32;
-using Omni2FA.Adapter.Utils;
+using Omni2FA.Net.Utils;
 
 namespace Omni2FA.Adapter {
 
