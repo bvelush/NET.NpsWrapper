@@ -10,11 +10,11 @@ using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
 using System.Linq;
 
-namespace Omni2FA.NPS.Adapter {
+namespace Omni2FA.NPS.Adapter.Utils {
     /// <summary>
     /// Helper class for resolving users and groups in both local and domain contexts.
     /// </summary>
-    internal static class PrincipalHelper {
+    internal static class Groups {
         private static string _hostname = string.Empty;
 
         /// <summary>

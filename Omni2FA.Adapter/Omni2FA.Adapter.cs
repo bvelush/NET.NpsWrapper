@@ -12,8 +12,8 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using Omni2FA.AuthClient;
-using System.DirectoryServices.AccountManagement;
 using Microsoft.Win32;
+using Omni2FA.NPS.Adapter.Utils;
 
 namespace Omni2FA.NPS.Adapter {
     public enum LogLevel {
@@ -60,9 +60,9 @@ namespace Omni2FA.NPS.Adapter {
                 initCount++;
                 _authenticator = new Authenticator();
 
-                // Initialize the PrincipalHelper
-                PrincipalHelper.Initialize();
-                WriteEventLog(LogLevel.Trace, $"Hostname detected: {PrincipalHelper.Hostname}");
+                // Initialize the Groups helper
+                Groups.Initialize();
+                WriteEventLog(LogLevel.Trace, $"Hostname detected: {Groups.Hostname}");
 
                 try {
                     using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
@@ -88,7 +88,7 @@ namespace Omni2FA.NPS.Adapter {
                             if (!string.IsNullOrEmpty(groupNames)) {
                                 foreach (var groupName in groupNames.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) {
                                     string trimmedName = groupName.Trim();
-                                    var result = PrincipalHelper.ResolveGroup(trimmedName);
+                                    var result = Groups.ResolveGroup(trimmedName);
 
                                     if (result != null && result.Success) {
                                         _noMfaGroupSids.Add(result.Sid);
@@ -175,7 +175,7 @@ namespace Omni2FA.NPS.Adapter {
                             userName = AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
 
                             // Resolve user groups using the helper
-                            var userResult = PrincipalHelper.ResolveUserGroups(userName);
+                            var userResult = Groups.ResolveUserGroups(userName);
 
                             if (userResult != null && userResult.Success) {
                                 // Check if any of the user's groups are in the NoMFA list
