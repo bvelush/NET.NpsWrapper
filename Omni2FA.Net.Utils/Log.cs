@@ -9,6 +9,8 @@ using OpenCymd.Nps.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
 
 namespace Omni2FA.Net.Utils {
     /// <summary>
@@ -74,6 +76,53 @@ namespace Omni2FA.Net.Utils {
             }
         }
 
+        public static void Event(Level level, string subj, Exception ex) {
+            var exceptionDetails = new List<string>();
+
+            // Unwrap all exception details
+            Exception currentEx = ex;
+            int level_depth = 0;
+            while (currentEx != null) {
+                var prefix = level_depth == 0 ? "Exception" : $"Inner Exception [{level_depth}]";
+                exceptionDetails.Add($"{prefix}: {currentEx.GetType().FullName}");
+                exceptionDetails.Add($"Message: {currentEx.Message}");
+
+                if (currentEx is HttpRequestException httpEx) {
+                    // Add specific HttpRequestException details
+                    exceptionDetails.Add($"HttpRequestException.HResult: 0x{currentEx.HResult:X8} ({currentEx.HResult})");
+                    if (httpEx.Data != null && httpEx.Data.Count > 0) {
+                        exceptionDetails.Add("HttpRequestException.Data:");
+                        foreach (var key in httpEx.Data.Keys) {
+                            exceptionDetails.Add($"  {key}: {httpEx.Data[key]}");
+                        }
+                    }
+                }
+
+                if (currentEx is WebException webEx) {
+                    // Add specific WebException details
+                    exceptionDetails.Add($"WebException.Status: {webEx.Status}");
+                    if (webEx.Response != null) {
+                        exceptionDetails.Add($"WebException.Response: {webEx.Response}");
+                    }
+                }
+
+                exceptionDetails.Add($"Source: {currentEx.Source ?? "N/A"}");
+                exceptionDetails.Add($"HResult: 0x{currentEx.HResult:X8} ({currentEx.HResult})");
+
+                if (!string.IsNullOrEmpty(currentEx.StackTrace)) {
+                    exceptionDetails.Add($"StackTrace: {currentEx.StackTrace}");
+                }
+
+                currentEx = currentEx.InnerException;
+                level_depth++;
+
+                if (currentEx != null) {
+                    exceptionDetails.Add(""); // Add separator line between exceptions
+                }
+            }
+
+            Event(level, subj, exceptionDetails);
+        }
 
         public static void logRequest(ExtensionControl control) {
             List<string> logMessage = new List<string> {
@@ -108,9 +157,6 @@ namespace Omni2FA.Net.Utils {
             }
             Event(Level.Trace, $"Response components: {s}");
         }
-
-        
-
 
         /// <summary>
         /// Gets module information (datetime and size) for logging

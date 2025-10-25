@@ -50,5 +50,11 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Omni2FA.Net.Utils\Omni2FA.Net.Utils.csproj">
+      <Project>{d2b4d63b-630d-4342-b5d3-4ea3fbb238de}</Project>
+      <Name>Omni2FA.Net.Utils</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

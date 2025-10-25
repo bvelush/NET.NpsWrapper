@@ -10,7 +10,6 @@ using OpenCymd.Nps.Plugin;
 using System.Collections.Generic;
 using System.Linq;
 using Omni2FA.AuthClient;
-using Microsoft.Win32;
 using Omni2FA.Net.Utils;
 
 namespace Omni2FA.Adapter {
@@ -19,7 +18,6 @@ namespace Omni2FA.Adapter {
     /// Provides the entry points for the NPS service (indirectly called by the C++/CLR wrapper).
     /// </summary>
     public class NpsAdapter {
-        const string APP_NAME = "Omni2FA.Adapter";
 
         private static int initCount = 0;
         // Add a static field for the authenticator
@@ -56,56 +54,45 @@ namespace Omni2FA.Adapter {
                 Groups.Initialize();
                 Log.Event(Log.Level.Trace, $"Hostname detected: {Groups.Hostname}");
 
-                try {
-                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
-                        if (key != null) {
-                            // Read trace logging setting
-                            var traceValue = key.GetValue(_enableTraceLoggingKey);
-                            if (traceValue != null && int.TryParse(traceValue.ToString(), out int traceInt)) {
-                                _enableTraceLogging = (traceInt == 1);
-                            }
+                using (var registry = new Registry(_regPath)) {
+                    // Read trace logging setting
+                    _enableTraceLogging = registry.GetBoolRegistryValue(_enableTraceLoggingKey, false);
+                    
+                    Log.SetTraceLoggingEnabled(_enableTraceLogging);
 
-                            // Read MFA-enabled NPS policy name
-                            var mfaPolicyValue = key.GetValue(_mfaEnabledNpsPolicyKey) as string;
-                            if (!string.IsNullOrEmpty(mfaPolicyValue)) {
-                                _mfaEnabledNpsPolicy = mfaPolicyValue.Trim();
-                                Log.Event(Log.Level.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
+                    // Read MFA-enabled NPS policy name
+                    _mfaEnabledNpsPolicy = registry.GetStringRegistryValue(_mfaEnabledNpsPolicyKey, string.Empty);
+                    if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy)) {
+                        _mfaEnabledNpsPolicy = _mfaEnabledNpsPolicy.Trim();
+                        Log.Event(Log.Level.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
+                    }
+                    else {
+                        Log.Event(Log.Level.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
+                    }
+
+                    // Read NoMFA group names and resolve to SIDs
+                    var groupNames = registry.GetStringRegistryValue(_noMfaKey, string.Empty);
+                    if (!string.IsNullOrEmpty(groupNames)) {
+                        foreach (var groupName in groupNames.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) {
+                            string trimmedName = groupName.Trim();
+                            var result = Groups.ResolveGroup(trimmedName);
+
+                            if (result != null && result.Success) {
+                                _noMfaGroupSids.Add(result.Sid);
+                                Log.Event(Log.Level.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
+                            }
+                            else if (result != null && !string.IsNullOrEmpty(result.Error)) {
+                                Log.Event(Log.Level.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
                             }
                             else {
-                                Log.Event(Log.Level.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
+                                Log.Event(Log.Level.Warning, $"NoMFA group not found: {trimmedName}");
                             }
-
-                            // Read NoMFA group names and resolve to SIDs
-                            var groupNames = key.GetValue(_noMfaKey) as string;
-                            if (!string.IsNullOrEmpty(groupNames)) {
-                                foreach (var groupName in groupNames.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) {
-                                    string trimmedName = groupName.Trim();
-                                    var result = Groups.ResolveGroup(trimmedName);
-
-                                    if (result != null && result.Success) {
-                                        _noMfaGroupSids.Add(result.Sid);
-                                        Log.Event(Log.Level.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
-                                    }
-                                    else if (result != null && !string.IsNullOrEmpty(result.Error)) {
-                                        Log.Event(Log.Level.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
-                                    }
-                                    else {
-                                        Log.Event(Log.Level.Warning, $"NoMFA group not found: {trimmedName}");
-                                    }
-                                }
-                            }
-                            else {
-                                Log.Event(Log.Level.Warning, "NoMfaGroups registry value is empty or missing.");
-                            }
-                        }
-                        else {
-                            Log.Event(Log.Level.Warning, $"Registry key not found: {_regPath}");
                         }
                     }
-                }
-                catch (Exception ex) {
-                    Log.Event(Log.Level.Warning, $"Error reading registry during initialization: {ex.Message}");
-                }
+                    else {
+                        Log.Event(Log.Level.Warning, "NoMfaGroups registry value is empty or missing.");
+                    }
+                } // Registry is properly disposed here
             }
             return 0;
         }
@@ -118,6 +105,12 @@ namespace Omni2FA.Adapter {
             initCount--;
             if (initCount == 0) {
                 Log.Event(Log.Level.Trace, "RadiusExtensionTerm called");
+                
+                // Dispose authenticator to free resources
+                if (_authenticator != null) {
+                    (_authenticator as IDisposable)?.Dispose();
+                    _authenticator = null;
+                }
             }
         }
         /// <summary>
@@ -187,6 +180,7 @@ namespace Omni2FA.Adapter {
                     }
 
                     if (performMfa) {
+                        // calling AuthenticateAsync synchronously
                         bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
                         if (resMfa) {
                             /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */

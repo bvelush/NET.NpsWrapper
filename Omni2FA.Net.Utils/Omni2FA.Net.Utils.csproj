@@ -60,6 +60,7 @@
     <Compile Include="OpenCymd\VendorSpecificAttribute.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Radius.cs" />
+    <Compile Include="Registry.cs" />
     <Compile Include="Str.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -60,14 +60,15 @@ namespace Omni2FA.Net.Utils {
 
             try {
                 using (PrincipalContext ctx = new PrincipalContext(contextType)) {
-                    GroupPrincipal group = GroupPrincipal.FindByIdentity(ctx, groupName);
-                    if (group != null) {
-                        return new GroupResolutionResult {
-                            GroupName = groupName,
-                            Sid = group.Sid.Value,
-                            IsLocal = isLocal,
-                            ContextType = contextType
-                        };
+                    using (GroupPrincipal group = GroupPrincipal.FindByIdentity(ctx, groupName)) {
+                        if (group != null) {
+                            return new GroupResolutionResult {
+                                GroupName = groupName,
+                                Sid = group.Sid.Value,
+                                IsLocal = isLocal,
+                                ContextType = contextType
+                            };
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -100,33 +101,35 @@ namespace Omni2FA.Net.Utils {
                 samAccountName = parts[1];
             }
 
-            // Determine if we should use local or domain context
             bool isLocal = (domain != null && string.Equals(domain, _hostname, StringComparison.OrdinalIgnoreCase));
             ContextType contextType = isLocal ? ContextType.Machine : ContextType.Domain;
 
             try {
-                PrincipalContext ctx = isLocal
+                using (PrincipalContext ctx = isLocal
                     ? new PrincipalContext(ContextType.Machine)
-                    : new PrincipalContext(ContextType.Domain, domain);
-
-                using (ctx) {
-                    UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
-                    if (user != null) {
-                        var groupSids = new HashSet<string>();
-                        var userGroups = user.GetAuthorizationGroups();
-                        foreach (var group in userGroups) {
-                            var sid = group.Sid?.Value;
-                            if (sid != null) {
-                                groupSids.Add(sid);
+                    : new PrincipalContext(ContextType.Domain, domain)) {
+                    
+                    using (UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName)) {
+                        if (user != null) {
+                            var groupSids = new HashSet<string>();
+                            using (var userGroups = user.GetAuthorizationGroups()) {
+                                foreach (Principal group in userGroups) {
+                                    using (group) {
+                                        var sid = group.Sid?.Value;
+                                        if (sid != null) {
+                                            groupSids.Add(sid);
+                                        }
+                                    }
+                                }
                             }
-                        }
 
-                        return new UserResolutionResult {
-                            UserName = userName,
-                            IsLocal = isLocal,
-                            ContextType = contextType,
-                            GroupSids = groupSids
-                        };
+                            return new UserResolutionResult {
+                                UserName = userName,
+                                IsLocal = isLocal,
+                                ContextType = contextType,
+                                GroupSids = groupSids
+                            };
+                        }
                     }
                 }
             } catch (Exception ex) {
