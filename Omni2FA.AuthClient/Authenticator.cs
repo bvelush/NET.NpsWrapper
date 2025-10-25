@@ -45,7 +45,7 @@ namespace Omni2FA.AuthClient {
         public Authenticator() {
             // Log component initialization with datetime and size
             var moduleInfo = GetModuleInfo();
-            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.Auth {moduleInfo}");
+            WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.AuthClient {moduleInfo}");
             
             // Read settings from registry
             try {

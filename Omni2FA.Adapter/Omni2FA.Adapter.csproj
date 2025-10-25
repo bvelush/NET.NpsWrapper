@@ -58,6 +58,7 @@
     <Compile Include="OpenCymd\RadiusCode.cs" />
     <Compile Include="OpenCymd\RadiusExtensionPoint.cs" />
     <Compile Include="OpenCymd\VendorSpecificAttribute.cs" />
+    <Compile Include="PrincipalHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

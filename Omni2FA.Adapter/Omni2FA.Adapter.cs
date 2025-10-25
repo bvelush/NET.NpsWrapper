@@ -40,7 +40,7 @@ namespace Omni2FA.NPS.Adapter {
         // Registry path and value name for NoMFA groups
         // [HKEY_LOCAL_MACHINE\SOFTWARE\Omni2FA.NPS]
         // "NoMfaGroups"="Group1;Group2;Group3"
-        private const string _regPath = @"SOFTWARE\\Omni2FA.NPS";
+        private const string _regPath = @"SOFTWARE\Omni2FA.NPS";
         private const string _noMfaKey = "NoMfaGroups";
         private const string _enableTraceLoggingKey = "EnableTraceLogging";
         private const string _mfaEnabledNpsPolicyKey = "MfaEnabledNPSPolicy";
@@ -55,10 +55,15 @@ namespace Omni2FA.NPS.Adapter {
             var moduleInfo = GetModuleInfo();
             WriteEventLog(LogLevel.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
             WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
-            
+
             if (initCount == 0) {
                 initCount++;
                 _authenticator = new Authenticator();
+
+                // Initialize the PrincipalHelper
+                PrincipalHelper.Initialize();
+                WriteEventLog(LogLevel.Trace, $"Hostname detected: {PrincipalHelper.Hostname}");
+
                 try {
                     using (RegistryKey key = Registry.LocalMachine.OpenSubKey(_regPath)) {
                         if (key != null) {
@@ -73,7 +78,8 @@ namespace Omni2FA.NPS.Adapter {
                             if (!string.IsNullOrEmpty(mfaPolicyValue)) {
                                 _mfaEnabledNpsPolicy = mfaPolicyValue.Trim();
                                 WriteEventLog(LogLevel.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
-                            } else {
+                            }
+                            else {
                                 WriteEventLog(LogLevel.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
                             }
 
@@ -82,29 +88,30 @@ namespace Omni2FA.NPS.Adapter {
                             if (!string.IsNullOrEmpty(groupNames)) {
                                 foreach (var groupName in groupNames.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)) {
                                     string trimmedName = groupName.Trim();
-                                    try {
-                                        using (PrincipalContext ctx = new PrincipalContext(ContextType.Domain)) {
-                                            GroupPrincipal group = GroupPrincipal.FindByIdentity(ctx, trimmedName);
-                                            if (group != null) {
-                                                var sid = group.Sid.Value;
-                                                _noMfaGroupSids.Add(sid);
-                                                WriteEventLog(LogLevel.Information, $"NoMFA group added: {trimmedName} (SID: {sid})");
-                                            } else {
-                                                WriteEventLog(LogLevel.Warning, $"NoMFA group not found: {trimmedName}");
-                                            }
-                                        }
-                                    } catch (Exception ex) {
-                                        WriteEventLog(LogLevel.Warning, $"Error resolving group '{trimmedName}': {ex.Message}");
+                                    var result = PrincipalHelper.ResolveGroup(trimmedName);
+
+                                    if (result != null && result.Success) {
+                                        _noMfaGroupSids.Add(result.Sid);
+                                        WriteEventLog(LogLevel.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
+                                    }
+                                    else if (result != null && !string.IsNullOrEmpty(result.Error)) {
+                                        WriteEventLog(LogLevel.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
+                                    }
+                                    else {
+                                        WriteEventLog(LogLevel.Warning, $"NoMFA group not found: {trimmedName}");
                                     }
                                 }
-                            } else {
+                            }
+                            else {
                                 WriteEventLog(LogLevel.Warning, "NoMfaGroups registry value is empty or missing.");
                             }
-                        } else {
+                        }
+                        else {
                             WriteEventLog(LogLevel.Warning, $"Registry key not found: {_regPath}");
                         }
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex) {
                     WriteEventLog(LogLevel.Warning, $"Error reading registry during initialization: {ex.Message}");
                 }
             }
@@ -118,7 +125,7 @@ namespace Omni2FA.NPS.Adapter {
         public static void RadiusExtensionTerm() {
             initCount--;
             if (initCount == 0) {
-                WriteEventLog(LogLevel.Trace, "RadiusExtensionInit called");
+                WriteEventLog(LogLevel.Trace, "RadiusExtensionTerm called");
             }
         }
         /// <summary>
@@ -145,18 +152,20 @@ namespace Omni2FA.NPS.Adapter {
                     logRequest(control);
                     bool performMfa = true;
                     var policyName = AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
-                    
+
                     // Check if we should perform MFA based on policy configuration
                     if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy)) {
                         // MFA policy is configured - only perform MFA if current policy matches
-                        if (string.IsNullOrEmpty(policyName) || 
+                        if (string.IsNullOrEmpty(policyName) ||
                             !string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
                             performMfa = false;
                             WriteEventLog(LogLevel.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
-                        } else {
+                        }
+                        else {
                             WriteEventLog(LogLevel.Trace, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
                         }
-                    } else {
+                    }
+                    else {
                         // No MFA policy configured - always perform MFA (secure default)
                         WriteEventLog(LogLevel.Trace, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
                     }
@@ -164,39 +173,27 @@ namespace Omni2FA.NPS.Adapter {
                     if (performMfa) {
                         try {
                             userName = AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
-                            // Check if user is in NoMFA group by SID
-                            PrincipalContext ctx;
-                            string samAccountName = userName;
-                            string domain = null;
-                            var parts = userName.Split('\\');
-                            if (parts.Length == 2) {
-                                domain = parts[0];
-                                samAccountName = parts[1];
-                                ctx = new PrincipalContext(ContextType.Domain, domain);
-                            }
-                            else {
-                                ctx = new PrincipalContext(ContextType.Domain);
-                            }
-                            using (ctx) {
-                                UserPrincipal user = UserPrincipal.FindByIdentity(ctx, samAccountName);
-                                if (user != null) {
-                                    var userGroups = user.GetAuthorizationGroups();
-                                    foreach (var group in userGroups) {
-                                        var sid = group.Sid?.Value;
-                                        if (sid != null && _noMfaGroupSids.Contains(sid)) {
-                                            performMfa = false;
-                                            WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group '{group.Name}', skipping MFA.");
-                                            break;
-                                        }
-                                    }
+
+                            // Resolve user groups using the helper
+                            var userResult = PrincipalHelper.ResolveUserGroups(userName);
+
+                            if (userResult != null && userResult.Success) {
+                                // Check if any of the user's groups are in the NoMFA list
+                                var matchingSids = userResult.GroupSids.Intersect(_noMfaGroupSids).ToList();
+                                if (matchingSids.Any()) {
+                                    performMfa = false;
+                                    WriteEventLog(LogLevel.Information, $"User {userName} is in NoMFA group (matched {matchingSids.Count} SID(s)), skipping MFA.");
                                 }
+                            }
+                            else if (userResult != null && !string.IsNullOrEmpty(userResult.Error)) {
+                                WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {userResult.Error}");
                             }
                         }
                         catch (Exception ex) {
                             WriteEventLog(LogLevel.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
                     }
-                    
+
                     if (performMfa) {
                         bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
                         if (resMfa) {
@@ -209,7 +206,8 @@ namespace Omni2FA.NPS.Adapter {
                             control.ResponseType = RadiusCode.AccessReject;
                             WriteEventLog(LogLevel.Warning, $"MFA failed for user {userName}");
                         }
-                    } else {
+                    }
+                    else {
                         control.ResponseType = RadiusCode.AccessAccept;
                         WriteEventLog(LogLevel.Information, $"MFA skipped for user {userName}, accepting request.");
                     }
@@ -228,11 +226,11 @@ namespace Omni2FA.NPS.Adapter {
         private static void logRequest(ExtensionControl control) {
             List<string> logMessage = new List<string>
 {
-                "NPS request start",
-                "-ExtensionPoint: " + control.ExtensionPoint.ToString(),
-                "-RequestType: " + control.RequestType.ToString(),
-                "-ResponseType: " + control.ResponseType.ToString()
-            };
+                        "NPS request start",
+                        "-ExtensionPoint: " + control.ExtensionPoint.ToString(),
+                        "-RequestType: " + control.RequestType.ToString(),
+                        "-ResponseType: " + control.ResponseType.ToString()
+                    };
 
             WriteEventLog(LogLevel.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
 
@@ -334,7 +332,8 @@ namespace Omni2FA.NPS.Adapter {
                     return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
                 }
                 return "(info unavailable)";
-            } catch {
+            }
+            catch {
                 return "(info unavailable)";
             }
         }
