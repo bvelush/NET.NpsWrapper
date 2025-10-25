@@ -8,9 +8,8 @@
 using System;
 using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
-using System.Linq;
 
-namespace Omni2FA.NPS.Adapter.Utils {
+namespace Omni2FA.Adapter.Utils {
     /// <summary>
     /// Helper class for resolving users and groups in both local and domain contexts.
     /// </summary>

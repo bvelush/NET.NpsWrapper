@@ -5,20 +5,14 @@
 //   GNU General Public License version 2.1 (GPLv2.1) 
 // </copyright>
 // --------------------------------------------------------------------------------------------------------------------
+using OpenCymd.Nps.Plugin;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Omni2FA.NPS.Adapter.Utils {
-    //public enum LogLevel {
-    //    Trace,
-    //    Information,
-    //    Warning,
-    //    Error
-    //}
-
+namespace Omni2FA.Adapter.Utils {
     /// <summary>
-    /// Helper class for writing to Windows Event Log.
+    /// Helper class for writing to Windows Event 
     /// </summary>
     internal static class Log {
         private const string APP_NAME = "Omni2FA.Adapter";
@@ -77,6 +71,63 @@ namespace Omni2FA.NPS.Adapter.Utils {
                 EventInstance eventInstance = new EventInstance(0, 0, winLevel);
                 var body = string.Join(Environment.NewLine, subj_body);
                 EventLog.WriteEvent(eventLog.Source, eventInstance, new List<string>() { subj + Environment.NewLine + body }.ToArray());
+            }
+        }
+
+
+        public static void logRequest(ExtensionControl control) {
+            List<string> logMessage = new List<string> {
+                        "NPS request start",
+                        "-ExtensionPoint: " + control.ExtensionPoint.ToString(),
+                        "-RequestType: " + control.RequestType.ToString(),
+                        "-ResponseType: " + control.ResponseType.ToString()
+            };
+
+            Event(Level.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
+
+            var userName = Radius.AttributeLookup(control.Request, RadiusAttributeType.UserName);
+            if (!string.IsNullOrEmpty(userName)) {
+                logMessage.Add("-UserName: " + userName);
+                logMessage.Add("-NAS IPAddress: " + Radius.AttributeLookup(control.Request, RadiusAttributeType.NASIPAddress));
+                logMessage.Add("-Src IPAddress: " + Radius.AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
+                logMessage.Add($"-Connection Request Policy Name: '{Radius.AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName)}'");
+                logMessage.Add($"-Network Policy Name: '{Radius.AttributeLookup(control.Request, RadiusAttributeType.PolicyName)}'");
+            }
+            Event(Level.Trace, "Authorization request", logMessage);
+
+            string s = "";
+            foreach (var attr in Radius.AttributesToList(control.Request)) {
+                s += " | " + Str.sanitize(attr);
+            }
+            Event(Level.Trace, $"Request components: {s}");
+
+
+            s = "";
+            foreach (var attr in Radius.AttributesToList(control.Response[RadiusCode.AccessAccept])) {
+                s += " ~ " + Str.sanitize(attr);
+            }
+            Event(Level.Trace, $"Response components: {s}");
+        }
+
+        
+
+
+        /// <summary>
+        /// Gets module information (datetime and size) for logging
+        /// </summary>
+        /// <returns>Formatted string with datetime and size</returns>
+        public static string GetModuleInfo() {
+            try {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                var location = assembly.Location;
+                if (System.IO.File.Exists(location)) {
+                    var fileInfo = new System.IO.FileInfo(location);
+                    return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
+                }
+                return "(info unavailable)";
+            }
+            catch {
+                return "(info unavailable)";
             }
         }
     }

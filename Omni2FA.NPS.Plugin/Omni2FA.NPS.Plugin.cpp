@@ -177,7 +177,7 @@ DWORD WINAPI RadiusExtensionInit(VOID)
     {
         if (!g_initialized)
             Initialize();
-        DWORD result = Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionInit();
+        DWORD result = Omni2FA::Adapter::NpsAdapter::RadiusExtensionInit();
         LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionInit completed with result: ", result.ToString()));
         return result;
     }
@@ -195,7 +195,7 @@ VOID WINAPI RadiusExtensionTerm(VOID)
     {
         if (g_initialized)
             Cleanup();
-        Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionTerm();
+        Omni2FA::Adapter::NpsAdapter::RadiusExtensionTerm();
         LogEvent(LogLevel::Trace, "RadiusExtensionTerm completed.");
     }
     catch (Exception^ ex)
@@ -211,7 +211,7 @@ DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
     {
         if (!g_initialized)
             Initialize();
-        DWORD result = Omni2FA::NPS::Adapter::NpsAdapter::RadiusExtensionProcess2(IntPtr(pECB));
+        DWORD result = Omni2FA::Adapter::NpsAdapter::RadiusExtensionProcess2(IntPtr(pECB));
         LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
         return result;
     }

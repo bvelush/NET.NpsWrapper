@@ -7,15 +7,13 @@
 // --------------------------------------------------------------------------------------------------------------------
 using System;
 using OpenCymd.Nps.Plugin;
-using System.Text;
-using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using Omni2FA.AuthClient;
 using Microsoft.Win32;
-using Omni2FA.NPS.Adapter.Utils;
+using Omni2FA.Adapter.Utils;
 
-namespace Omni2FA.NPS.Adapter {
+namespace Omni2FA.Adapter {
 
     /// <summary>
     /// Provides the entry points for the NPS service (indirectly called by the C++/CLR wrapper).
@@ -46,7 +44,7 @@ namespace Omni2FA.NPS.Adapter {
         /// <returns>A return value other then 0 will cause NPS to fail to start</returns>
         public static uint RadiusExtensionInit() {
             // Log component initialization with datetime and size
-            var moduleInfo = GetModuleInfo();
+            var moduleInfo = Log.GetModuleInfo();
             Log.Event(Log.Level.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
             Log.Event(Log.Level.Trace, "RadiusExtensionInit called");
 
@@ -143,9 +141,9 @@ namespace Omni2FA.NPS.Adapter {
                      * If MFA returns OK keep original disposition -> AccessAccept disposition
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
-                    logRequest(control);
+                    Log.logRequest(control);
                     bool performMfa = true;
-                    var policyName = AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
+                    var policyName = Radius.AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
 
                     // Check if we should perform MFA based on policy configuration
                     if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy)) {
@@ -166,7 +164,7 @@ namespace Omni2FA.NPS.Adapter {
 
                     if (performMfa) {
                         try {
-                            userName = AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
+                            userName = Radius.AttributeLookup(control.Request, RadiusAttributeType.UserName).Trim();
 
                             // Resolve user groups using the helper
                             var userResult = Groups.ResolveUserGroups(userName);
@@ -208,88 +206,6 @@ namespace Omni2FA.NPS.Adapter {
                 }
             }
             return 0;
-        }
-
-        private static string sanitizeString(string input) {
-            // for some reason, stirng.Trim() does not remove trailing \0 char
-            if (input[input.Length - 1] == '\0')
-                return input.Substring(0, input.Length - 1); // Remove trailing char
-            return input.Trim();
-        }
-
-        private static void logRequest(ExtensionControl control) {
-            List<string> logMessage = new List<string>
-{
-                        "NPS request start",
-                        "-ExtensionPoint: " + control.ExtensionPoint.ToString(),
-                        "-RequestType: " + control.RequestType.ToString(),
-                        "-ResponseType: " + control.ResponseType.ToString()
-                    };
-
-            Log.Event(Log.Level.Trace, "RadiusExtensionProcess2 called with params:", logMessage);
-
-            var userName = AttributeLookup(control.Request, RadiusAttributeType.UserName);
-            if (!string.IsNullOrEmpty(userName)) {
-                logMessage.Add("-UserName: " + userName);
-                logMessage.Add("-NAS IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.NASIPAddress));
-                logMessage.Add("-Src IPAddress: " + AttributeLookup(control.Request, RadiusAttributeType.SrcIPAddress));
-                logMessage.Add($"-Connection Request Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.CRPPolicyName)}'");
-                logMessage.Add($"-Network Policy Name: '{AttributeLookup(control.Request, RadiusAttributeType.PolicyName)}'");
-            }
-            Log.Event(Log.Level.Trace, "Authorization request", logMessage);
-
-            string s = "";
-            foreach (var attr in AttributesToList(control.Request)) {
-                s += " | " + sanitizeString(attr);
-            }
-            Log.Event(Log.Level.Trace, $"Request components: {s}");
-
-
-            s = "";
-            foreach (var attr in AttributesToList(control.Response[RadiusCode.AccessAccept])) {
-                s += " ~ " + sanitizeString(attr);
-            }
-            Log.Event(Log.Level.Trace, $"Response components: {s}");
-        }
-
-        private static string AttributeLookup(IList<RadiusAttribute> attributesList, RadiusAttributeType attributeType) {
-            var a = attributesList.FirstOrDefault(x => x.AttributeId.Equals((int)attributeType));
-            if (a == null)
-                return string.Empty;
-            var ret_val = (a.Value is byte[] val) ? Encoding.Default.GetString(val) : a.Value.ToString();
-            return sanitizeString(ret_val);
-        }
-        /* Get all attributes*/
-        private static List<string> AttributesToList(IList<RadiusAttribute> attributesList) {
-            var r = new List<string>();
-            foreach (var attrib in attributesList) {
-                string attribName = (Enum.IsDefined(typeof(RadiusAttributeType), attrib.AttributeId)) ?
-                    ((RadiusAttributeType)attrib.AttributeId).ToString()
-                    : attrib.AttributeId.ToString();
-                string attribValue = attrib.Value is byte[] val ? Encoding.Default.GetString(val) : attrib.Value.ToString();
-                r.Add($"{attribName}: {attribValue}");
-            }
-            return r;
-        }
-        
-
-        /// <summary>
-        /// Gets module information (datetime and size) for logging
-        /// </summary>
-        /// <returns>Formatted string with datetime and size</returns>
-        private static string GetModuleInfo() {
-            try {
-                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                var location = assembly.Location;
-                if (System.IO.File.Exists(location)) {
-                    var fileInfo = new System.IO.FileInfo(location);
-                    return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
-                }
-                return "(info unavailable)";
-            }
-            catch {
-                return "(info unavailable)";
-            }
         }
     }
 }
