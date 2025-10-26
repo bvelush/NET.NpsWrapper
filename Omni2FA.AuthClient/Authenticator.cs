@@ -9,6 +9,7 @@ namespace Omni2FA.AuthClient {
     public class Authenticator : IDisposable {
 
         private readonly HttpClient _httpClient;
+        private readonly bool _ownsHttpClient; // Track if we own the HttpClient
         private bool _disposed = false;
 
         private int _authTimeout = 60; // seconds
@@ -43,7 +44,17 @@ namespace Omni2FA.AuthClient {
             // TODO: message and details are not used currently
         }
 
-        public Authenticator() {
+        /// <summary>
+        /// Creates an Authenticator with default configuration from registry.
+        /// </summary>
+        public Authenticator() : this(null) {
+        }
+
+        /// <summary>
+        /// Creates an Authenticator with an injected HttpClient for testing.
+        /// </summary>
+        /// <param name="httpClient">Optional HttpClient instance. If null, creates a default one.</param>
+        public Authenticator(HttpClient httpClient) {
             // Log component initialization with datetime and size
             var moduleInfo = Log.GetModuleInfo();
             Log.Event(Log.Level.Information, $"Initializing Omni2FA.AuthClient {moduleInfo}");
@@ -63,7 +74,24 @@ namespace Omni2FA.AuthClient {
                  
             Log.SetTraceLoggingEnabled(_enableTraceLogging);
 
-            // Create HttpClientHandler with SSL and auth configuration
+            if (httpClient != null) {
+                // Use injected HttpClient (typically for testing)
+                _httpClient = httpClient;
+                _ownsHttpClient = false;
+                Log.Event(Log.Level.Trace, "Using injected HttpClient");
+            } else {
+                // Create default HttpClient with configuration from registry
+                _httpClient = CreateDefaultHttpClient();
+                _ownsHttpClient = true;
+            }
+
+            Log.Event(Log.Level.Information, $"Omni2FA.Auth initialized with service URL: {_serviceUrl}");
+        }
+
+        /// <summary>
+        /// Creates the default HttpClient with SSL and authentication configuration.
+        /// </summary>
+        private HttpClient CreateDefaultHttpClient() {
             var handler = new HttpClientHandler();
             
             // Configure SSL certificate validation
@@ -75,18 +103,23 @@ namespace Omni2FA.AuthClient {
                 Log.Event(Log.Level.Information, "SSL certificate validation disabled");
             }
 
-            _httpClient = new HttpClient(handler);
-            _httpClient.Timeout = TimeSpan.FromSeconds(_authTimeout);
+            var client = new HttpClient(handler);
+            client.Timeout = TimeSpan.FromSeconds(_authTimeout);
 
             // Configure basic authentication if credentials are provided
             if (!string.IsNullOrEmpty(_basicAuthUsername) && !string.IsNullOrEmpty(_basicAuthPassword)) {
                 var authValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_basicAuthUsername}:{_basicAuthPassword}"));
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
                 Log.Event(Log.Level.Information, $"Basic authentication configured for user: {_basicAuthUsername}");
             }
 
-            Log.Event(Log.Level.Information, $"Omni2FA.Auth initialized with service URL: {_serviceUrl}");
+            return client;
         }
+
+        /// <summary>
+        /// Gets the service URL for testing purposes.
+        /// </summary>
+        internal string ServiceUrl => _serviceUrl;
 
         public async Task<bool> AuthenticateAsync(string samid) {
             try {
@@ -189,7 +222,10 @@ namespace Omni2FA.AuthClient {
         protected virtual void Dispose(bool disposing) {
             if (!_disposed) {
                 if (disposing) {
-                    _httpClient?.Dispose();
+                    // Only dispose HttpClient if we own it
+                    if (_ownsHttpClient) {
+                        _httpClient?.Dispose();
+                    }
                 }
                 _disposed = true;
             }

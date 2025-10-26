@@ -14,10 +14,23 @@ namespace Omni2FA.AuthClient.Tests
     public class AuthenticatorTests
     {
         [TestMethod]
-        public void Constructor_ShouldInitializeSuccessfully()
+        public void Constructor_WithoutHttpClient_ShouldInitializeSuccessfully()
         {
             // Act & Assert - should not throw
             var authenticator = new Authenticator();
+            Assert.IsNotNull(authenticator);
+        }
+
+        [TestMethod]
+        public void Constructor_WithHttpClient_ShouldInitializeSuccessfully()
+        {
+            // Arrange
+            var mockHttpClient = new HttpClient();
+
+            // Act
+            var authenticator = new Authenticator(mockHttpClient);
+
+            // Assert
             Assert.IsNotNull(authenticator);
         }
 
