@@ -125,6 +125,9 @@ namespace Omni2FA.Net.Utils {
         }
 
         public static void logRequest(ExtensionControl control) {
+            if (!_enableTraceLogging)
+                return;
+
             List<string> logMessage = new List<string> {
                         "NPS request start",
                         "-ExtensionPoint: " + control.ExtensionPoint.ToString(),

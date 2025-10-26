@@ -206,7 +206,7 @@ VOID WINAPI RadiusExtensionTerm(VOID)
 
 DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
 {
-    LogEvent(LogLevel::Trace, "RadiusExtensionProcess2 called.");
+	LogEvent(LogLevel::Trace, "RadiusExtensionProcess2 called.");
     try
     {
         if (!g_initialized)

@@ -113,6 +113,7 @@ namespace Omni2FA.Adapter {
                 }
             }
         }
+        
         /// <summary>
         /// Called by the NPS host to process an authentication or authorization request.
         /// </summary>
@@ -121,6 +122,7 @@ namespace Omni2FA.Adapter {
         public static uint RadiusExtensionProcess2(IntPtr ecbPointer) {
             var control = new ExtensionControl(ecbPointer);
             string userName = string.Empty;
+            Log.logRequest(control);
             /* 
              * Authorization request 
              *      -ExtensionPoint: Authorization
@@ -134,7 +136,7 @@ namespace Omni2FA.Adapter {
                      * If MFA returns OK keep original disposition -> AccessAccept disposition
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
-                    Log.logRequest(control);
+                    Log.Event(Log.Level.Trace, "Processing authorized AccessRequest for MFA"); // TODO: improve logging
                     bool performMfa = true;
                     var policyName = Radius.AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
 
