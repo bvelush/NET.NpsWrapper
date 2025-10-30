@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "../Generated/version.h"
 
 using namespace System;
 using namespace System::Reflection;
@@ -11,12 +12,16 @@ using namespace System::Security::Permissions;
 [assembly:AssemblyConfigurationAttribute(L"")];
 [assembly:AssemblyCompanyAttribute(L"")];
 [assembly:AssemblyProductAttribute(L"Omni2FA.NPS.Plugin")];
-[assembly:AssemblyCopyrightAttribute(L"https://github.com/lestoilfante 2023")];
+[assembly:AssemblyCopyrightAttribute(L"Copyright (c) 2023-2025")];
 [assembly:AssemblyTrademarkAttribute(L"")];
 [assembly:AssemblyCultureAttribute(L"")];
 
-[assembly:AssemblyVersionAttribute("1.0.*")];
+// Version is now defined in Generated/version.h
+// VERSION_STRING is already a string literal, just need to convert to wide string
+#define WIDE2(x) L##x
+#define WIDE(x) WIDE2(x)
+[assembly:AssemblyVersionAttribute(WIDE(VERSION_STRING))];
+[assembly:AssemblyInformationalVersionAttribute(WIDE(VERSION_SHORT_STRING) L"+" WIDE(GIT_COMMIT_HASH))];
 
 [assembly:ComVisible(false)];
-
 [assembly:CLSCompliantAttribute(true)];

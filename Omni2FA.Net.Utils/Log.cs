@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 
 namespace Omni2FA.Net.Utils {
     /// <summary>
@@ -162,21 +163,55 @@ namespace Omni2FA.Net.Utils {
         }
 
         /// <summary>
-        /// Gets module information (datetime and size) for logging
+        /// Gets module version information from Git-based versioning for logging.
         /// </summary>
-        /// <returns>Formatted string with datetime and size</returns>
+        /// <returns>Formatted string with version, commit hash, and build status</returns>
         public static string GetModuleInfo() {
             try {
-                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                var location = assembly.Location;
-                if (System.IO.File.Exists(location)) {
-                    var fileInfo = new System.IO.FileInfo(location);
-                    return $"({fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}, {fileInfo.Length} bytes)";
+                var assembly = Assembly.GetExecutingAssembly();
+                
+                // Try to get the informational version which includes Git info
+                var infoVersionAttr = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+                if (infoVersionAttr != null && !string.IsNullOrEmpty(infoVersionAttr.InformationalVersion)) {
+                    // Format: "1.0.0+abc1234" or similar from setuptools_scm-like versioning
+                    return $"v{infoVersionAttr.InformationalVersion}";
                 }
-                return "(info unavailable)";
+                
+                // Fallback to standard version attributes
+                var version = assembly.GetName().Version;
+                var fileVersionAttr = assembly.GetCustomAttribute<AssemblyFileVersionAttribute>();
+                
+                if (fileVersionAttr != null) {
+                    // Check if GitVersionInformation class is available (from generated VersionInfo.cs)
+                    var gitVersionType = assembly.GetType("GitVersionInformation");
+                    if (gitVersionType != null) {
+                        var commitHashField = gitVersionType.GetField("CommitHash");
+                        var isCleanField = gitVersionType.GetField("IsClean");
+                        var distanceField = gitVersionType.GetField("CommitDistance");
+                        
+                        if (commitHashField != null && isCleanField != null && distanceField != null) {
+                            string commitHash = commitHashField.GetValue(null) as string;
+                            bool isClean = (bool)isCleanField.GetValue(null);
+                            int distance = (int)distanceField.GetValue(null);
+                            
+                            string cleanStatus = isClean ? "clean" : "dirty";
+                            string distanceInfo = distance > 0 ? $"+{distance}" : "";
+                            
+                            return $"v{fileVersionAttr.Version} ({commitHash}, {cleanStatus}{distanceInfo})";
+                        }
+                    }
+                    
+                    return $"v{fileVersionAttr.Version}";
+                }
+                
+                if (version != null) {
+                    return $"v{version}";
+                }
+                
+                return "(version unavailable)";
             }
             catch {
-                return "(info unavailable)";
+                return "(version unavailable)";
             }
         }
     }

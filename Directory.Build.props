@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <!-- Auto-generate version from Git -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    
+    <!-- Common properties -->
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Deterministic>false</Deterministic>
+    
+    <!-- Import generated version -->
+    <CompileGeneratedVersion>true</CompileGeneratedVersion>
+  </PropertyGroup>
+
+  <Target Name="GenerateVersionInfo" BeforeTargets="BeforeBuild">
+    <Message Text="Generating version information from Git..." Importance="high" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)build\Generate-Version.ps1&quot; -OutputDir &quot;$(MSBuildThisFileDirectory)Generated&quot;" />
+  </Target>
+
+  <ItemGroup Condition="$(CompileGeneratedVersion) == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)Generated\VersionInfo.cs" Link="Properties\VersionInfo.cs" />
+  </ItemGroup>
+</Project>

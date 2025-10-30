@@ -1,8 +1,8 @@
 // --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // <copyright>
-//   Copyright lestoilfante 2023 (https://github.com/lestoilfante)
+//   Copyright bvelush 2025 (https://github.com/bvelush)
 //   
-//   GNU General Public License version 2.1 (GPLv2.1) 
 // </copyright>
 // --------------------------------------------------------------------------------------------------------------------
 #include "pch.h"
@@ -117,24 +117,81 @@ Assembly^ LocalAssemblyResolver(Object^ sender, ResolveEventArgs^ args)
     }
 }
 
-// Get module information for logging
+// Get module version information from Git-based versioning for logging
 System::String^ GetModuleInfo()
 {
     try
     {
-        System::String^ modulePath = Assembly::GetExecutingAssembly()->Location;
-        if (File::Exists(modulePath))
+        Assembly^ assembly = Assembly::GetExecutingAssembly();
+        
+        // Try to get the informational version which includes Git info
+        array<Object^>^ infoVersionAttrs = assembly->GetCustomAttributes(AssemblyInformationalVersionAttribute::typeid, false);
+        if (infoVersionAttrs != nullptr && infoVersionAttrs->Length > 0)
         {
-            FileInfo^ fileInfo = gcnew FileInfo(modulePath);
-            return String::Format("({0}, {1} bytes)", 
-                fileInfo->LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"), 
-                fileInfo->Length);
+            AssemblyInformationalVersionAttribute^ infoVersionAttr = 
+                safe_cast<AssemblyInformationalVersionAttribute^>(infoVersionAttrs[0]);
+            
+            if (!String::IsNullOrEmpty(infoVersionAttr->InformationalVersion))
+            {
+                // Format: "1.0.0+abc1234" or similar from setuptools_scm-like versioning
+                return String::Format("v{0}", infoVersionAttr->InformationalVersion);
+            }
         }
-        return "(info unavailable)";
+        
+        // Fallback to standard version attributes
+        Version^ version = assembly->GetName()->Version;
+        array<Object^>^ fileVersionAttrs = assembly->GetCustomAttributes(AssemblyFileVersionAttribute::typeid, false);
+        
+        if (fileVersionAttrs != nullptr && fileVersionAttrs->Length > 0)
+        {
+            AssemblyFileVersionAttribute^ fileVersionAttr = 
+                safe_cast<AssemblyFileVersionAttribute^>(fileVersionAttrs[0]);
+            
+            // Check if GitVersionInformation class is available (from generated VersionInfo.cs)
+            Type^ gitVersionType = assembly->GetType("GitVersionInformation");
+            if (gitVersionType != nullptr)
+            {
+                try
+                {
+                    FieldInfo^ commitHashField = gitVersionType->GetField("CommitHash");
+                    FieldInfo^ isCleanField = gitVersionType->GetField("IsClean");
+                    FieldInfo^ distanceField = gitVersionType->GetField("CommitDistance");
+                    
+                    if (commitHashField != nullptr && isCleanField != nullptr && distanceField != nullptr)
+                    {
+                        System::String^ commitHash = safe_cast<System::String^>(commitHashField->GetValue(nullptr));
+                        bool isClean = safe_cast<bool>(isCleanField->GetValue(nullptr));
+                        int distance = safe_cast<int>(distanceField->GetValue(nullptr));
+                        
+                        System::String^ cleanStatus = isClean ? "clean" : "dirty";
+                        System::String^ distanceInfo = distance > 0 ? String::Format("+{0}", distance) : "";
+                        
+                        return String::Format("v{0} ({1}, {2}{3})", 
+                            fileVersionAttr->Version, 
+                            commitHash, 
+                            cleanStatus, 
+                            distanceInfo);
+                    }
+                }
+                catch (Exception^)
+                {
+                    // Fall through to simpler version
+                }
+            }
+            
+            return String::Format("v{0}", fileVersionAttr->Version);
+        }
+        
+        if (version != nullptr)
+        {
+            return String::Format("v{0}", version->ToString());
+        }
+        
+        return "(version unavailable)";
     }
     catch (Exception^)
     {
-        return "(info unavailable)";
+        return "(version unavailable)";
     }
 }
 

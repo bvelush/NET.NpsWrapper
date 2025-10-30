@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -27,6 +27,10 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>Omni2FA.NPS.Plugin</ProjectName>
   </PropertyGroup>
+  <PropertyGroup>
+  <GeneratedFilesDir>$(SolutionDir)Generated</GeneratedFilesDir>
+</PropertyGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -176,4 +180,14 @@
     <Delete Files="$(TargetPath).metagen" ContinueOnError="true" />
     <Message Text="Deleted metagen file: $(TargetPath).metagen" Importance="high" />
   </Target>
+  
+  <!-- Add a pre-build event -->
+<Target Name="GenerateVersionInfo" BeforeTargets="ClCompile">
+  <Message Text="Generating version information from Git..." Importance="high" />
+  <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)build\Generate-Version.ps1&quot; -OutputDir &quot;$(GeneratedFilesDir)&quot;" />
+</Target>
+
+<ItemGroup>
+  <ClInclude Include="$(GeneratedFilesDir)\version.h" />
+</ItemGroup>
 </Project>
