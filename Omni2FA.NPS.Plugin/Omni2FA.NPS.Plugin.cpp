@@ -59,7 +59,7 @@ EventLogEntryType MapLogLevel(LogLevel level) {
 }
 
 // Log to Windows Application Event Log, fallback: append error to log file in DLL directory
-void LogEvent(LogLevel level, System::String^ message)
+void LogEvent(LogLevel level, int eventCode, System::String^ message)
 {
     if (level == LogLevel::Trace && !g_enableTraceLogging)
         return;
@@ -71,7 +71,7 @@ void LogEvent(LogLevel level, System::String^ message)
     eventLog->Source = LogConstants::LOG_SOURCE;
     if (level == LogLevel::Trace)
         message = String::Concat("[TRACE] ", message);
-    eventLog->WriteEntry(message, MapLogLevel(level));
+    eventLog->WriteEntry(message, MapLogLevel(level), eventCode);
 }
 
 // Read EnableTraceLogging from registry
@@ -94,25 +94,25 @@ void ReadTraceLoggingSetting()
 // Custom assembly resolution method
 Assembly^ LocalAssemblyResolver(Object^ sender, ResolveEventArgs^ args)
 {
-    LogEvent(LogLevel::Trace, "LocalAssemblyResolver called.");
+    LogEvent(LogLevel::Trace, 7, "LocalAssemblyResolver called.");
     try
     {
         System::String^ folderPath = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
         System::String^ assemblyPath = Path::Combine(folderPath, String::Concat(args->Name->Split(',')[0], ".dll"));
-        LogEvent(LogLevel::Information, String::Concat("Assembly resolve requested: ", args->Name));
+        LogEvent(LogLevel::Information, 200, String::Concat("Assembly resolve requested: ", args->Name));
 
         if (File::Exists(assemblyPath))
         {
-            LogEvent(LogLevel::Information, String::Concat("Loading assembly from: ", assemblyPath));
+            LogEvent(LogLevel::Information, 200, String::Concat("Loading assembly from: ", assemblyPath));
             return Assembly::LoadFrom(assemblyPath);
         }
 
-        LogEvent(LogLevel::Warning, String::Concat("Assembly not found: ", assemblyPath));
+        LogEvent(LogLevel::Warning, 300, String::Concat("Assembly not found: ", assemblyPath));
         return nullptr;
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error in LocalAssemblyResolver: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 400, String::Concat("Error in LocalAssemblyResolver: ", ex->ToString()));
         return nullptr;
     }
 }
@@ -201,14 +201,14 @@ void Initialize()
     try
     {
         ReadTraceLoggingSetting();
-        LogEvent(LogLevel::Information, String::Format("Initializing Omni2FA.NPS.Plugin {0}", GetModuleInfo()));
+        LogEvent(LogLevel::Information, 100, String::Format("Initializing Omni2FA.NPS.Plugin {0}", GetModuleInfo()));
         AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = true;
-        LogEvent(LogLevel::Information, "Omni2FA.NPS.Plugin initialized.");
+        LogEvent(LogLevel::Information, 101, "Omni2FA.NPS.Plugin initialized.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error during Initialize: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 401, String::Concat("Error during Initialize: ", ex->ToString()));
     }
 }
 
@@ -216,65 +216,65 @@ void Cleanup()
 {
     try
     {
-        LogEvent(LogLevel::Information, "Cleaning up Omni2FA.NPS.Plugin...");
+        LogEvent(LogLevel::Information, 110, "Cleaning up Omni2FA.NPS.Plugin...");
         AppDomain::CurrentDomain->AssemblyResolve -= gcnew ResolveEventHandler(LocalAssemblyResolver);
         g_initialized = false;
-        LogEvent(LogLevel::Information, "Omni2FA.NPS.Plugin cleaned up.");
+        LogEvent(LogLevel::Information, 111, "Omni2FA.NPS.Plugin cleaned up.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error during Cleanup: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 402, String::Concat("Error during Cleanup: ", ex->ToString()));
     }
 }
 
 DWORD WINAPI RadiusExtensionInit(VOID)
 {
-    LogEvent(LogLevel::Trace, "RadiusExtensionInit called.");
+    LogEvent(LogLevel::Trace, 1, "RadiusExtensionInit called.");
     try
     {
         if (!g_initialized)
             Initialize();
         DWORD result = Omni2FA::Adapter::NpsAdapter::RadiusExtensionInit();
-        LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionInit completed with result: ", result.ToString()));
+        LogEvent(LogLevel::Trace, 4, String::Concat("RadiusExtensionInit completed with result: ", result.ToString()));
         return result;
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionInit: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 403, String::Concat("Error in RadiusExtensionInit: ", ex->ToString()));
         return ERROR_GEN_FAILURE;
     }
 }
 
 VOID WINAPI RadiusExtensionTerm(VOID)
 {
-    LogEvent(LogLevel::Trace, "RadiusExtensionTerm called.");
+    LogEvent(LogLevel::Trace, 2, "RadiusExtensionTerm called.");
     try
     {
         if (g_initialized)
             Cleanup();
         Omni2FA::Adapter::NpsAdapter::RadiusExtensionTerm();
-        LogEvent(LogLevel::Trace, "RadiusExtensionTerm completed.");
+        LogEvent(LogLevel::Trace, 5, "RadiusExtensionTerm completed.");
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionTerm: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 404, String::Concat("Error in RadiusExtensionTerm: ", ex->ToString()));
     }
 }
 
 DWORD WINAPI RadiusExtensionProcess2(PRADIUS_EXTENSION_CONTROL_BLOCK pECB)
 {
-	LogEvent(LogLevel::Trace, "RadiusExtensionProcess2 called.");
+	LogEvent(LogLevel::Trace, 3, "RadiusExtensionProcess2 called.");
     try
     {
         if (!g_initialized)
             Initialize();
         DWORD result = Omni2FA::Adapter::NpsAdapter::RadiusExtensionProcess2(IntPtr(pECB));
-        LogEvent(LogLevel::Trace, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
+        LogEvent(LogLevel::Trace, 6, String::Concat("RadiusExtensionProcess2 completed with result: ", result.ToString()));
         return result;
     }
     catch (Exception^ ex)
     {
-        LogEvent(LogLevel::Error, String::Concat("Error in RadiusExtensionProcess2: ", ex->ToString()));
+        LogEvent(LogLevel::Error, 405, String::Concat("Error in RadiusExtensionProcess2: ", ex->ToString()));
         return ERROR_GEN_FAILURE;
     }
 }

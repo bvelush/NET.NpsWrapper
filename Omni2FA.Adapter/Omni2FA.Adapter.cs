@@ -43,8 +43,8 @@ namespace Omni2FA.Adapter {
         public static uint RadiusExtensionInit() {
             // Log component initialization with datetime and size
             var moduleInfo = Log.GetModuleInfo();
-            Log.Event(Log.Level.Information, $"Initializing Omni2FA.Adapter {moduleInfo}");
-            Log.Event(Log.Level.Trace, "RadiusExtensionInit called");
+            Log.Event(Log.Level.Information, 102, $"Initializing Omni2FA.Adapter {moduleInfo}");
+            Log.Event(Log.Level.Trace, 10, "RadiusExtensionInit called");
 
             if (initCount == 0) {
                 initCount++;
@@ -52,7 +52,7 @@ namespace Omni2FA.Adapter {
 
                 // Initialize the Groups helper
                 Groups.Initialize();
-                Log.Event(Log.Level.Trace, $"Hostname detected: {Groups.Hostname}");
+                Log.Event(Log.Level.Trace, 12, $"Hostname detected: {Groups.Hostname}");
 
                 using (var registry = new Registry(_regPath)) {
                     // Read trace logging setting
@@ -64,10 +64,10 @@ namespace Omni2FA.Adapter {
                     _mfaEnabledNpsPolicy = registry.GetStringRegistryValue(_mfaEnabledNpsPolicyKey, string.Empty);
                     if (!string.IsNullOrEmpty(_mfaEnabledNpsPolicy)) {
                         _mfaEnabledNpsPolicy = _mfaEnabledNpsPolicy.Trim();
-                        Log.Event(Log.Level.Information, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
+                        Log.Event(Log.Level.Information, 201, $"MFA-enabled NPS policy set to: {_mfaEnabledNpsPolicy}");
                     }
                     else {
-                        Log.Event(Log.Level.Information, "MfaEnabledNPSPolicy registry value is empty or missing.");
+                        Log.Event(Log.Level.Information, 202, "MfaEnabledNPSPolicy registry value is empty or missing.");
                     }
 
                     // Read NoMFA group names and resolve to SIDs
@@ -79,18 +79,18 @@ namespace Omni2FA.Adapter {
 
                             if (result != null && result.Success) {
                                 _noMfaGroupSids.Add(result.Sid);
-                                Log.Event(Log.Level.Information, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
+                                Log.Event(Log.Level.Information, 140, $"NoMFA group added ({result.ContextName}): {trimmedName} (SID: {result.Sid})");
                             }
                             else if (result != null && !string.IsNullOrEmpty(result.Error)) {
-                                Log.Event(Log.Level.Warning, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
+                                Log.Event(Log.Level.Warning, 302, $"Error resolving group '{trimmedName}' in {result.ContextName}: {result.Error}");
                             }
                             else {
-                                Log.Event(Log.Level.Warning, $"NoMFA group not found: {trimmedName}");
+                                Log.Event(Log.Level.Warning, 303, $"NoMFA group not found: {trimmedName}");
                             }
                         }
                     }
                     else {
-                        Log.Event(Log.Level.Warning, "NoMfaGroups registry value is empty or missing.");
+                        Log.Event(Log.Level.Warning, 304, "NoMfaGroups registry value is empty or missing.");
                     }
                 } // Registry is properly disposed here
             }
@@ -104,7 +104,7 @@ namespace Omni2FA.Adapter {
         public static void RadiusExtensionTerm() {
             initCount--;
             if (initCount == 0) {
-                Log.Event(Log.Level.Trace, "RadiusExtensionTerm called");
+                Log.Event(Log.Level.Trace, 11, "RadiusExtensionTerm called");
                 
                 // Dispose authenticator to free resources
                 if (_authenticator != null) {
@@ -136,7 +136,7 @@ namespace Omni2FA.Adapter {
                      * If MFA returns OK keep original disposition -> AccessAccept disposition
                      * If MFA returns KO override original disposition -> AccessReject 
                      */
-                    Log.Event(Log.Level.Trace, "Processing authorized AccessRequest for MFA"); // TODO: improve logging
+                    Log.Event(Log.Level.Trace, 124, "Processing authorized AccessRequest for MFA");
                     bool performMfa = true;
                     var policyName = Radius.AttributeLookup(control.Request, RadiusAttributeType.PolicyName);
 
@@ -146,15 +146,15 @@ namespace Omni2FA.Adapter {
                         if (string.IsNullOrEmpty(policyName) ||
                             !string.Equals(policyName, _mfaEnabledNpsPolicy, StringComparison.OrdinalIgnoreCase)) {
                             performMfa = false;
-                            Log.Event(Log.Level.Information, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
+                            Log.Event(Log.Level.Information, 203, $"Policy '{policyName}' does NOT match MFA-enabled policy '{_mfaEnabledNpsPolicy}', skipping MFA.");
                         }
                         else {
-                            Log.Event(Log.Level.Trace, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
+                            Log.Event(Log.Level.Trace, 125, $"Policy '{policyName}' matches MFA-enabled policy '{_mfaEnabledNpsPolicy}', MFA will be performed.");
                         }
                     }
                     else {
                         // No MFA policy configured - always perform MFA (secure default)
-                        Log.Event(Log.Level.Trace, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
+                        Log.Event(Log.Level.Trace, 126, $"No MFA-enabled policy configured, MFA will be performed for all requests (secure default).");
                     }
 
                     if (performMfa) {
@@ -169,15 +169,15 @@ namespace Omni2FA.Adapter {
                                 var matchingSids = userResult.GroupSids.Intersect(_noMfaGroupSids).ToList();
                                 if (matchingSids.Any()) {
                                     performMfa = false;
-                                    Log.Event(Log.Level.Information, $"User {userName} is in NoMFA group (matched {matchingSids.Count} SID(s)), skipping MFA.");
+                                    Log.Event(Log.Level.Information, 141, $"User {userName} is in NoMFA group (matched {matchingSids.Count} SID(s)), skipping MFA.");
                                 }
                             }
                             else if (userResult != null && !string.IsNullOrEmpty(userResult.Error)) {
-                                Log.Event(Log.Level.Warning, $"Error checking NoMFA group membership for user '{userName}': {userResult.Error}");
+                                Log.Event(Log.Level.Warning, 305, $"Error checking NoMFA group membership for user '{userName}': {userResult.Error}");
                             }
                         }
                         catch (Exception ex) {
-                            Log.Event(Log.Level.Warning, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
+                            Log.Event(Log.Level.Warning, 305, $"Error checking NoMFA group membership for user '{userName}': {ex.Message}");
                         }
                     }
 
@@ -187,17 +187,17 @@ namespace Omni2FA.Adapter {
                         if (resMfa) {
                             /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
                             control.ResponseType = RadiusCode.AccessAccept;
-                            Log.Event(Log.Level.Information, $"MFA succeeded for user {userName}");
+                            Log.Event(Log.Level.Information, 130, $"MFA succeeded for user {userName}");
                         }
                         else {
                             /* Set final disposition to AccessReject - Note that could be changed by other extensions */
                             control.ResponseType = RadiusCode.AccessReject;
-                            Log.Event(Log.Level.Warning, $"MFA failed for user {userName}");
+                            Log.Event(Log.Level.Warning, 131, $"MFA failed for user {userName}");
                         }
                     }
                     else {
                         control.ResponseType = RadiusCode.AccessAccept;
-                        Log.Event(Log.Level.Information, $"MFA skipped for user {userName}, accepting request.");
+                        Log.Event(Log.Level.Information, 132, $"MFA skipped for user {userName}, accepting request.");
                     }
                 }
             }

@@ -57,7 +57,7 @@ namespace Omni2FA.AuthClient {
         public Authenticator(HttpClient httpClient) {
             // Log component initialization with datetime and size
             var moduleInfo = Log.GetModuleInfo();
-            Log.Event(Log.Level.Information, $"Initializing Omni2FA.AuthClient {moduleInfo}");
+            Log.Event(Log.Level.Information, 103, $"Initializing Omni2FA.AuthClient {moduleInfo}");
             
             using (var registry = new Registry(_regPath)) {
                 // Read settings from registry
@@ -78,14 +78,14 @@ namespace Omni2FA.AuthClient {
                 // Use injected HttpClient (typically for testing)
                 _httpClient = httpClient;
                 _ownsHttpClient = false;
-                Log.Event(Log.Level.Trace, "Using injected HttpClient");
+                Log.Event(Log.Level.Trace, 29, "Using injected HttpClient");
             } else {
                 // Create default HttpClient with configuration from registry
                 _httpClient = CreateDefaultHttpClient();
                 _ownsHttpClient = true;
             }
 
-            Log.Event(Log.Level.Information, $"Omni2FA.Auth initialized with service URL: {_serviceUrl}");
+            Log.Event(Log.Level.Information, 204, $"Omni2FA.Auth initialized with service URL: {_serviceUrl}");
         }
 
         /// <summary>
@@ -97,10 +97,10 @@ namespace Omni2FA.AuthClient {
             // Configure SSL certificate validation
             if (_ignoreSslErrors) {
                 handler.ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => {
-                    Log.Event(Log.Level.Warning, "SSL certificate validation bypassed due to IgnoreSslErrors setting");
+                    Log.Event(Log.Level.Warning, 301, "SSL certificate validation bypassed due to IgnoreSslErrors setting");
                     return true; // Accept all certificates
                 };
-                Log.Event(Log.Level.Information, "SSL certificate validation disabled");
+                Log.Event(Log.Level.Information, 205, "SSL certificate validation disabled");
             }
 
             var client = new HttpClient(handler);
@@ -110,7 +110,7 @@ namespace Omni2FA.AuthClient {
             if (!string.IsNullOrEmpty(_basicAuthUsername) && !string.IsNullOrEmpty(_basicAuthPassword)) {
                 var authValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_basicAuthUsername}:{_basicAuthPassword}"));
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
-                Log.Event(Log.Level.Information, $"Basic authentication configured for user: {_basicAuthUsername}");
+                Log.Event(Log.Level.Information, 206, $"Basic authentication configured for user: {_basicAuthUsername}");
             }
 
             return client;
@@ -126,90 +126,90 @@ namespace Omni2FA.AuthClient {
                 // TODO: lets generate requestid here, send auth request, then poll for result
                 //var requestId = Guid.NewGuid().ToString();
                 var authRequestJson = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
-                Log.Event(Log.Level.Trace, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
+                Log.Event(Log.Level.Trace, 20, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
                 var authenticateResponse = await _httpClient.PostAsync(
                     $"{_serviceUrl}/Authenticate", 
                     new StringContent(authRequestJson, Encoding.UTF8, "application/json")
                 );
                 if (!authenticateResponse.IsSuccessStatusCode) {
                     var responseContent = await authenticateResponse.Content.ReadAsStringAsync();
-                    Log.Event(Log.Level.Error, $"Service responded with status: {authenticateResponse.StatusCode}, content: {responseContent}");
+                    Log.Event(Log.Level.Error, 410, $"Service responded with status: {authenticateResponse.StatusCode}, content: {responseContent}");
                     return false;
                 }
                 var authenticateResponseJson = await authenticateResponse.Content.ReadAsStringAsync();
-                Log.Event(Log.Level.Trace, $"Received authentication response for user: {samid}, response: {authenticateResponseJson}");
+                Log.Event(Log.Level.Trace, 21, $"Received authentication response for user: {samid}, response: {authenticateResponseJson}");
                 var authenticateResponseObj = JsonConvert.DeserializeObject<AuthResultResponse>(authenticateResponseJson);
-                Log.Event(Log.Level.Trace, $"Deserialized authentication response for user: {samid}, status: {authenticateResponseObj?.status}");
+                Log.Event(Log.Level.Trace, 22, $"Deserialized authentication response for user: {samid}, status: {authenticateResponseObj?.status}");
                 if (authenticateResponseObj == null) {
-                    Log.Event(Log.Level.Error, $"Invalid response from service for user: {samid}");
+                    Log.Event(Log.Level.Error, 411, $"Invalid response from service for user: {samid}");
                     return false;
                 }
                 if (authenticateResponseObj.status < 0) { // early answer, no need of polling
-                    Log.Event(Log.Level.Trace, $"Authentication failed for user: {samid} without polling, status: {authenticateResponseObj.status}");
+                    Log.Event(Log.Level.Trace, 23, $"Authentication failed for user: {samid} without polling, status: {authenticateResponseObj.status}");
                     return false;
                 }
                 if (authenticateResponseObj.status > 0) { // early success, no need of polling
-                    Log.Event(Log.Level.Trace, $"Authentication succeeded for user: {samid} without polling, status: {authenticateResponseObj.status}");
+                    Log.Event(Log.Level.Trace, 24, $"Authentication succeeded for user: {samid} without polling, status: {authenticateResponseObj.status}");
                     return true;
                 }
 
                 await Task.Delay(_waitBeforePoll * 1000);
                 for (int i = 0; i < _pollMaxSeconds; i++) {
                     try {
-                        Log.Event(Log.Level.Trace, $"Polling AuthResult for user: {samid}, attempt: {i + 1}");
+                        Log.Event(Log.Level.Trace, 25, $"Polling AuthResult for user: {samid}, attempt: {i + 1}");
                         var authResultResponse = await _httpClient.PostAsync(
                             $"{_serviceUrl}/AuthResult",
                             new StringContent(authRequestJson, Encoding.UTF8, "application/json")
                         );
                         var authResultResponseContent = await authResultResponse.Content.ReadAsStringAsync();
                         if (!authResultResponse.IsSuccessStatusCode) {
-                            Log.Event(Log.Level.Warning, $"AuthResult responded with status: {authResultResponse.StatusCode}, content: {authResultResponseContent}");
+                            Log.Event(Log.Level.Warning, 310, $"AuthResult responded with status: {authResultResponse.StatusCode}, content: {authResultResponseContent}");
                             return false;
                         }
                         var authResultResponseJson = JsonConvert.DeserializeObject<AuthResultResponse>(authResultResponseContent);
-                        Log.Event(Log.Level.Trace, $"Polled AuthResult for user: {samid}, response: {authResultResponseContent}");
+                        Log.Event(Log.Level.Trace, 26, $"Polled AuthResult for user: {samid}, response: {authResultResponseContent}");
                         if (authResultResponseJson == null) {
-                            Log.Event(Log.Level.Error, $"Invalid AuthResult response for user {samid}");
+                            Log.Event(Log.Level.Error, 412, $"Invalid AuthResult response for user {samid}");
                             return false;
                         }
                         if (authResultResponseJson.status > 0) { // auth success
-                            Log.Event(Log.Level.Trace, $"Authentication succeeded for user: {samid}");
+                            Log.Event(Log.Level.Trace, 27, $"Authentication succeeded for user: {samid}");
                             return true;
                         }
                         if (authResultResponseJson.status < 0) { // auth failure
-                            Log.Event(Log.Level.Trace, $"Authentication failed for user: {samid}");
+                            Log.Event(Log.Level.Trace, 28, $"Authentication failed for user: {samid}");
                             return false;
                         }
                         // result == 1 (pending), continue polling
                         await Task.Delay(_pollInterval * 1000);
                     }
                     catch (TaskCanceledException ex) {
-                        Log.Event(Log.Level.Error, $"Timeout reached while polling AuthResult for user {samid}", ex);
+                        Log.Event(Log.Level.Error, 417, $"Timeout reached while polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     catch (HttpRequestException ex) {
-                        Log.Event(Log.Level.Error, $"MFA Service is unreachable while polling AuthResult for user {samid}", ex);
+                        Log.Event(Log.Level.Error, 418, $"MFA Service is unreachable while polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     catch (Exception ex) {
-                        Log.Event(Log.Level.Error, $"Error polling AuthResult for user {samid}", ex);
+                        Log.Event(Log.Level.Error, 419, $"Error polling AuthResult for user {samid}", ex);
                         return false;
                     }
                     await Task.Delay(1000); // Wait 1 second before next poll
                 }
-                Log.Event(Log.Level.Error, $"Authentication result not received in time for user: {samid}");
+                Log.Event(Log.Level.Error, 413, $"Authentication result not received in time for user: {samid}");
                 return false;
             }
             catch (TaskCanceledException ex) {
-                Log.Event(Log.Level.Error, $"Timeout reached while authenticating user {samid}", ex);
+                Log.Event(Log.Level.Error, 414, $"Timeout reached while authenticating user {samid}", ex);
                 return false;
             }
             catch (HttpRequestException ex) {
-                Log.Event(Log.Level.Error, $"MFA Service is unreachable while authenticating user {samid}", ex);
+                Log.Event(Log.Level.Error, 415, $"MFA Service is unreachable while authenticating user {samid}", ex);
                 return false;
             }
             catch (Exception ex) {
-                Log.Event(Log.Level.Error, $"Error authenticating user {samid}", ex);
+                Log.Event(Log.Level.Error, 416, $"Error authenticating user {samid}", ex);
                 return false;
             }
         }

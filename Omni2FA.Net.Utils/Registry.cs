@@ -13,11 +13,11 @@ namespace Omni2FA.Net.Utils {
             try {                 
                 baseKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(BaseKeyPath, false);
                 if (baseKey == null) {
-                    Log.Event(Log.Level.Warning, $"Registry base key not found: {BaseKeyPath}");
+                    Log.Event(Log.Level.Warning, 304, $"Registry base key not found: {BaseKeyPath}");
                 }
             }
             catch (Exception ex) {
-                Log.Event(Log.Level.Warning, $"Error reading settings from registry: {ex.Message}");
+                Log.Event(Log.Level.Warning, 305, $"Error reading settings from registry: {ex.Message}");
             }
         }
 
