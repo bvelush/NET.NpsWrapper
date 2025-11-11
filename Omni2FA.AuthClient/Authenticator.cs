@@ -121,11 +121,11 @@ namespace Omni2FA.AuthClient {
         /// </summary>
         internal string ServiceUrl => _serviceUrl;
 
-        public async Task<bool> AuthenticateAsync(string samid) {
+        public async Task<bool> AuthenticateAsync(string samid, string policyName) {
             try {
                 // TODO: lets generate requestid here, send auth request, then poll for result
                 //var requestId = Guid.NewGuid().ToString();
-                var authRequestJson = JsonConvert.SerializeObject(new { samid = samid, requestor = "SMK-RDG" });
+                var authRequestJson = JsonConvert.SerializeObject(new { samid = samid, requestor = $"NPS:{policyName}" });
                 Log.Event(Log.Level.Trace, 20, $"Sending authentication request for user: {samid} to {_serviceUrl}/Authenticate");
                 var authenticateResponse = await _httpClient.PostAsync(
                     $"{_serviceUrl}/Authenticate", 

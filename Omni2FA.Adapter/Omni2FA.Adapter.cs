@@ -183,7 +183,7 @@ namespace Omni2FA.Adapter {
 
                     if (performMfa) {
                         // calling AuthenticateAsync synchronously
-                        bool resMfa = _authenticator.AuthenticateAsync(userName).Result;
+                        bool resMfa = _authenticator.AuthenticateAsync(userName, policyName).Result;
                         if (resMfa) {
                             /* Keep final disposition to AccessAccept - Note that could be changed by other extensions */
                             control.ResponseType = RadiusCode.AccessAccept;
