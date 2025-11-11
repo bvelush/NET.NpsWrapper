@@ -49,10 +49,5 @@ Both values need to contain appropriate full path to `Omni2FA.NPS.Plugin.dll`.
 
 # Compatibility
 
-Tested on Windows Server 2016 - 2019.
+Tested on Windows Server 2012 - 2019.
 
-# License & Copyright
-
-[Copyright lestoilfante 2023](https://github.com/lestoilfante)
-
-GNU General Public License version 2.1 (GPLv2.1) 
