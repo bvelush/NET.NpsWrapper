@@ -1,6 +1,6 @@
 # Creating Source in Windows Applications log
 ```PowerShell
-New-EventLog -LogName Application -Source "Omni2FA.NPS.Plugin"
+New-EventLog -LogName Application -Source "SMK2FA.NPS.Plugin"
 New-EventLog -LogName Application -Source "Omni2FA.Adapter"
 New-EventLog -LogName Application -Source "Omni2FA.AuthClient"
 ```

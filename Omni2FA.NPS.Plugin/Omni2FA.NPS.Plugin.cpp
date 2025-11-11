@@ -31,7 +31,7 @@ static bool g_initialized = false;
 static bool g_enableTraceLogging = false;
 
 // Registry path and key
-static const wchar_t* REG_PATH = L"SOFTWARE\\Omni2FA.NPS";
+static const wchar_t* REG_PATH = L"SOFTWARE\\SMK2FA.NPS";
 static const wchar_t* ENABLE_TRACE_KEY = L"EnableTraceLogging";
 
 // Log name and source constants
@@ -39,7 +39,7 @@ public ref class LogConstants abstract sealed
 {
 public:
     literal System::String^ LOG_NAME = "Application";
-    literal System::String^ LOG_SOURCE = "Omni2FA.NPS.Plugin";
+    literal System::String^ LOG_SOURCE = "SMK2FA.NPS.Plugin";
 };
 
 // Map LogLevel to EventLogEntryType
